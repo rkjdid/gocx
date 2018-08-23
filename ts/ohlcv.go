@@ -1,4 +1,4 @@
-package gocx
+package ts
 
 import (
 	"github.com/ccxt/ccxt/go/util"

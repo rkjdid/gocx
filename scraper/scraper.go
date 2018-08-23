@@ -1,9 +1,10 @@
-package gocx
+package scraper
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/ccxt/ccxt/go/util"
+	"github.com/rkjdid/gocx/ts"
 	"log"
 	"net/http"
 	"net/url"
@@ -23,12 +24,14 @@ var TfToDuration = map[string]time.Duration{
 	TfDay:    time.Hour * 24,
 }
 
+var debug = false
+
 type CryptoCompareResponse struct {
 	Response          string        `json:"Response"`
 	Message           string        `json:"Message"`
 	Type              int           `json:"Type"`
 	Aggregated        bool          `json:"Aggregated"`
-	Data              []OHLCV       `json:"Data"`
+	Data              ts.OHLCVs     `json:"Data"`
 	TimeTo            util.JSONTime `json:"TimeTo"`
 	TimeFrom          util.JSONTime `json:"TimeFrom"`
 	FirstValueInArray bool          `json:"FirstValueInArray"`
@@ -47,7 +50,7 @@ func (cc CryptoCompareResponse) String() string {
 }
 
 func FetchHistorical(exchange string, base, quote string, tf string, aggregate int, from, to time.Time,
-) (data OHLCVs, err error) {
+) (data ts.OHLCVs, err error) {
 	if aggregate < 1 {
 		aggregate = 1
 	}
@@ -78,7 +81,7 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		q.Set("limit", fmt.Sprintf("%d", to.Sub(from)/d+1))
 
 		u.RawQuery = q.Encode()
-		if *debug {
+		if debug {
 			log.Printf("GET %s", u.String())
 		}
 		resp, err := http.Get(u.String())
@@ -89,14 +92,14 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		if err != nil {
 			return nil, fmt.Errorf("couldn't decode body: %s", err)
 		}
-		if *debug {
+		if debug {
 			log.Printf("%d: %s", resp.StatusCode, ccResp)
 		}
 		if ccResp.Response != "Success" {
 			return nil, fmt.Errorf("%d %s", ccResp.Type, ccResp.Message)
 		}
 		// stop querying if we only have 0 values
-		if len(OHLCVs(ccResp.Data).Trim()) == 0 {
+		if len(ts.OHLCVs(ccResp.Data).Trim()) == 0 {
 			return data, nil
 		}
 

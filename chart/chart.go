@@ -3,7 +3,7 @@ package chart
 import (
 	"fmt"
 	"github.com/pplcc/plotext/custplotter"
-	"github.com/rkjdid/gocx"
+	"github.com/rkjdid/gocx/ts"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
@@ -42,7 +42,7 @@ func SetRanges(minX, maxX, minY, maxY float64) {
 	p.X.Min, p.X.Max, p.Y.Min, p.Y.Max = minX, maxX, minY, maxY
 }
 
-func AddOHLCVs(data gocx.OHLCVs) {
+func AddOHLCVs(data ts.OHLCVs) {
 	if len(data) < 2 {
 		panic(fmt.Errorf("too few data values in ohlcvs: %d", len(data)))
 	}

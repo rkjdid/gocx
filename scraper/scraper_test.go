@@ -1,4 +1,4 @@
-package gocx
+package scraper
 
 import (
 	"testing"

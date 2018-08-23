@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"github.com/markcheno/go-talib"
 	"github.com/montanaflynn/stats"
-	"github.com/rkjdid/gocx"
 	"github.com/rkjdid/gocx/chart"
+	"github.com/rkjdid/gocx/scraper"
+	"gonum.org/v1/plot/vg"
 	"log"
+	"math"
 	"os"
 	"time"
 )
@@ -25,7 +27,7 @@ var (
 	from = flag.String("from", "03-01-2009", "from date: dd-mm-yyyy")
 	x    = flag.String("x", "", "exchange to scrape from")
 	to   = flag.String("to", "", "to date: dd-mm-yyyy (defaults to time.Now())")
-	tf   = flag.String("tf", gocx.TfDay, "minute/hour/day")
+	tf   = flag.String("tf", scraper.TfDay, "minute/hour/day")
 	agg  = flag.Int("agg", 1, "aggregate timeframe (`-tf hour -agg 2` for 2h candles)")
 
 	tfrom, tto time.Time
@@ -49,7 +51,7 @@ func init() {
 			os.Exit(1)
 		}
 	}
-	_, ok := gocx.TfToDuration[*tf]
+	_, ok := scraper.TfToDuration[*tf]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "invalid timeframe \"%s\"\n", *tf)
 		os.Exit(1)
@@ -60,7 +62,7 @@ func main() {
 	//tfrom = time.Time{}.AddDate(2016, 0, 0)
 	//tto = tfrom.AddDate(1, 0, 0)
 
-	data, err := gocx.FetchHistorical(*x, *bcur, *qcur, *tf, *agg, tfrom, tto)
+	data, err := scraper.FetchHistorical(*x, *bcur, *qcur, *tf, *agg, tfrom, tto)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,10 +70,8 @@ func main() {
 
 	chart.SetTitles(fmt.Sprintf("%s:%s%s", *x, *bcur, *qcur), "", "")
 	chart.AddOHLCVs(data)
-	//chart.AddLine(data.ToXYer(data.Close()), "close")
-	//chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 24, 6, 0.6)), "alma24")
-	//chart.AddLine(data.ToXYer(talib.Ema(data.Close(), 24)), "ema24")
-	//chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 120, 6, 0.6)), "alma120")
+	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 24, 6, 0.6)), "alma24")
+	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 120, 6, 0.6)), "alma120")
 
 	h, _ := stats.Mean(stats.Float64Data(data.Close()))
 	chart.AddHorizontal(h, "mean")
@@ -80,7 +80,9 @@ func main() {
 	chart.AddHorizontal(h, "median")
 
 	name := "chart.png"
-	err = chart.Save(720, 400, true, name)
+	width := vg.Length(math.Max(float64(len(data)), 1200))
+	height := width / 1.77
+	err = chart.Save(width, height, true, name)
 	if err != nil {
 		log.Fatal(err)
 	}
