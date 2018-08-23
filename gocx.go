@@ -1,9 +1,11 @@
 package gocx
 
-import (
-	"flag"
-)
+import "flag"
 
 var (
-	debug = flag.Bool("debug", false, "enable debug log")
+	Debug bool
 )
+
+func init() {
+	flag.BoolVar(&Debug, "debug", false, "enable debug log")
+}

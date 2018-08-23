@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ccxt/ccxt/go/util"
+	"github.com/rkjdid/gocx"
 	"github.com/rkjdid/gocx/ts"
 	"log"
 	"net/http"
@@ -23,8 +24,6 @@ var TfToDuration = map[string]time.Duration{
 	TfHour:   time.Hour,
 	TfDay:    time.Hour * 24,
 }
-
-var debug = false
 
 type CryptoCompareResponse struct {
 	Response          string        `json:"Response"`
@@ -81,7 +80,7 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		q.Set("limit", fmt.Sprintf("%d", to.Sub(from)/d+1))
 
 		u.RawQuery = q.Encode()
-		if debug {
+		if gocx.Debug {
 			log.Printf("GET %s", u.String())
 		}
 		resp, err := http.Get(u.String())
@@ -92,7 +91,7 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		if err != nil {
 			return nil, fmt.Errorf("couldn't decode body: %s", err)
 		}
-		if debug {
+		if gocx.Debug {
 			log.Printf("%d: %s", resp.StatusCode, ccResp)
 		}
 		if ccResp.Response != "Success" {
