@@ -56,6 +56,9 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 	if from.After(to) {
 		return nil, fmt.Errorf("from is after to date")
 	}
+	if to.After(time.Now()) {
+		to = time.Now()
+	}
 
 	d, ok := TfToDuration[tf]
 	if !ok {
