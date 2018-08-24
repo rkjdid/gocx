@@ -70,6 +70,11 @@ func main() {
 	// cleanup data
 	data = data.Trim().Clean()
 
+	if len(data) == 0 {
+		fmt.Fprintf(os.Stderr, "no data available")
+		os.Exit(1)
+	}
+
 	// update actual dates used
 	tto = time.Time(data[0].Timestamp)
 	tfrom = time.Time(data[len(data)-1].Timestamp)
