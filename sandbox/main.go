@@ -9,7 +9,9 @@ import (
 	"github.com/rkjdid/gocx/chart"
 	"github.com/rkjdid/gocx/scraper"
 	"github.com/rkjdid/gocx/strategy"
+	"gonum.org/v1/plot/vg"
 	"log"
+	"math"
 	"os"
 	"time"
 )
@@ -59,15 +61,15 @@ func init() {
 }
 
 func main() {
-	//tfrom = time.Time{}.AddDate(2016, 0, 0)
-	//tto = tfrom.AddDate(1, 0, 0)
+	tfrom = time.Time{}.AddDate(2016, 0, 0)
+	tto = tfrom.AddDate(1, 0, 0)
 
 	data, err := scraper.FetchHistorical(*x, *bcur, *qcur, *tf, *agg, tfrom, tto)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// cleanup data
+	// cleanup input data
 	data = data.Trim().Clean()
 
 	if len(data) == 0 {
@@ -91,7 +93,21 @@ func main() {
 		hi, *bcur, *qcur, time.Duration(*agg)*scraper.TfToDuration[*tf],
 		tto.Format(tformatH), tfrom.Format(tformatH))
 
-	strat := strategy.NewALMACross(12, 82)
+	// alma configs
+	almaShort, almaLong, almaSigma, almaOffset := 12, 82, 6., 0.6
+
+	// init chart and draw MAs
+	chart.SetTitles(fmt.Sprintf("%s:%s%s", *x, *bcur, *qcur), "", "")
+	chart.AddOHLCVs(data)
+	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), almaShort, almaSigma, almaOffset)),
+		fmt.Sprintf("alma%d", almaShort))
+	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), almaLong, almaSigma, almaOffset)),
+		fmt.Sprintf("alma%d", almaLong))
+	h, _ := stats.Mean(stats.Float64Data(data.Close()))
+	chart.AddHorizontal(h, "mean")
+
+	// init & feed strategy
+	strat := strategy.NewALMACross(almaShort, almaLong)
 	for _, v := range data {
 		signal := strat.AddTick(v)
 		if signal != strategy.NoSignal {
@@ -105,6 +121,9 @@ func main() {
 				b.Quote = b.ToQuote(v.Close)
 				b.Base = 0
 			}
+
+			// draw signal
+			chart.AddSignal(signal, v.Close)
 		}
 	}
 
@@ -115,23 +134,13 @@ func main() {
 	fmt.Printf("Work  : %.2f%% (%.2f%%/day)\n", w, w/(tfrom.Sub(tto).Hours()/24))
 	fmt.Printf("B&Hold: %.2f%%\n", tn/t0*100-100)
 
-	//chart.SetTitles(fmt.Sprintf("%s:%s%s", *x, *bcur, *qcur), "", "")
-	//chart.AddOHLCVs(data)
-	//chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 24, 6, 0.6)), "alma24")
-	//chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 120, 6, 0.6)), "alma120")
-	//
-	//h, _ := stats.Mean(stats.Float64Data(data.Close()))
-	//chart.AddHorizontal(h, "mean")
-	//
-	//h, _ = stats.Median(stats.Float64Data(data.Close()))
-	//chart.AddHorizontal(h, "median")
-	//
-	//name := "chart.png"
-	//width := vg.Length(math.Max(float64(len(data)), 1200))
-	//height := width / 1.77
-	//err = chart.Save(width, height, true, name)
-	//if err != nil {
-	//  log.Fatal(err)
-	//}
-	//log.Printf("saved \"%s\"", name)
+	// draw chart
+	cname := fmt.Sprintf("c%s%s.png", *bcur, *qcur)
+	width := vg.Length(math.Max(float64(len(data)), 1200))
+	height := width / 1.77
+	err = chart.Save(width, height, true, cname)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("saved \"%s\"", cname)
 }

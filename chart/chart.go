@@ -3,6 +3,7 @@ package chart
 import (
 	"fmt"
 	"github.com/pplcc/plotext/custplotter"
+	"github.com/rkjdid/gocx/strategy"
 	"github.com/rkjdid/gocx/ts"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
@@ -85,6 +86,26 @@ func AddHorizontalWithStyle(f float64, label string, style draw.LineStyle) {
 
 func AddHorizontal(f float64, label string) {
 	AddHorizontalWithStyle(f, label, NextLineStyle())
+}
+
+func AddSignal(signal strategy.Signal, y float64) {
+	if signal == strategy.NoSignal {
+		return
+	}
+
+	s, err := plotter.NewScatter(Point{float64(signal.Time.Unix()), y})
+	if err != nil {
+		panic(err)
+	}
+
+	if signal.Action == strategy.Buy {
+		s.GlyphStyle.Shape = draw.BoxGlyph{}
+		s.GlyphStyle.Color = Green
+	} else {
+		s.GlyphStyle.Shape = draw.SquareGlyph{}
+		s.GlyphStyle.Color = Red
+	}
+	p.Add(s)
 }
 
 func Save(dimX, dimY vg.Length, yGrid bool, file string) error {
