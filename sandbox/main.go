@@ -8,9 +8,8 @@ import (
 	"github.com/montanaflynn/stats"
 	"github.com/rkjdid/gocx/chart"
 	"github.com/rkjdid/gocx/scraper"
-	"gonum.org/v1/plot/vg"
+	"github.com/rkjdid/gocx/strategy"
 	"log"
-	"math"
 	"os"
 	"time"
 )
@@ -32,6 +31,7 @@ var (
 
 	tfrom, tto time.Time
 	tformat    = "02-01-2006" // dd-mm-yyyy
+	tformatH   = "02-01-2006 15:04"
 )
 
 func init() {
@@ -66,25 +66,67 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// cleanup data
 	data = data.Trim().Clean()
 
-	chart.SetTitles(fmt.Sprintf("%s:%s%s", *x, *bcur, *qcur), "", "")
-	chart.AddOHLCVs(data)
-	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 24, 6, 0.6)), "alma24")
-	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 120, 6, 0.6)), "alma120")
+	// update actual dates used
+	tto = time.Time(data[0].Timestamp)
+	tfrom = time.Time(data[len(data)-1].Timestamp)
 
-	h, _ := stats.Mean(stats.Float64Data(data.Close()))
-	chart.AddHorizontal(h, "mean")
+	// set some capital at t0
+	b0 := Bank{Quote: 1000}
+	b := b0
 
-	h, _ = stats.Median(stats.Float64Data(data.Close()))
-	chart.AddHorizontal(h, "median")
-
-	name := "chart.png"
-	width := vg.Length(math.Max(float64(len(data)), 1200))
-	height := width / 1.77
-	err = chart.Save(width, height, true, name)
-	if err != nil {
-		log.Fatal(err)
+	var hi string
+	if *x != "" {
+		hi += *x + ":"
 	}
-	log.Printf("saved \"%s\"", name)
+	fmt.Printf("%s%s%s - tf:%s from %s to %s\n",
+		hi, *bcur, *qcur, time.Duration(*agg)*scraper.TfToDuration[*tf],
+		tto.Format(tformatH), tfrom.Format(tformatH))
+
+	strat := strategy.NewALMACross(12, 82)
+	for _, v := range data {
+		signal := strat.AddTick(v)
+		if signal != strategy.NoSignal {
+			fmt.Printf("%4s %2.1f @%5.2f - %s\n",
+				signal.Action, signal.Strength, v.Close, time.Time(v.Timestamp).Format(tformatH))
+
+			if signal.Action == strategy.Buy {
+				b.Base = b.ToBase(v.Close)
+				b.Quote = 0
+			} else {
+				b.Quote = b.ToQuote(v.Close)
+				b.Base = 0
+			}
+		}
+	}
+
+	t0 := data[0].Close
+	tn := data[len(data)-1].Open
+	w := (b.ToQuote(tn) / b0.ToQuote(t0) * 100) - 100
+	fmt.Printf("Bank  : %.3f%s (%.1f%s)\n", b.ToBase(tn), *bcur, b.ToQuote(tn), *qcur)
+	fmt.Printf("Work  : %.2f%% (%.2f%%/day)\n", w, w/(tfrom.Sub(tto).Hours()/24))
+	fmt.Printf("B&Hold: %.2f%%\n", tn/t0*100-100)
+
+	//chart.SetTitles(fmt.Sprintf("%s:%s%s", *x, *bcur, *qcur), "", "")
+	//chart.AddOHLCVs(data)
+	//chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 24, 6, 0.6)), "alma24")
+	//chart.AddLine(data.ToXYer(talib.Alma(data.Close(), 120, 6, 0.6)), "alma120")
+	//
+	//h, _ := stats.Mean(stats.Float64Data(data.Close()))
+	//chart.AddHorizontal(h, "mean")
+	//
+	//h, _ = stats.Median(stats.Float64Data(data.Close()))
+	//chart.AddHorizontal(h, "median")
+	//
+	//name := "chart.png"
+	//width := vg.Length(math.Max(float64(len(data)), 1200))
+	//height := width / 1.77
+	//err = chart.Save(width, height, true, name)
+	//if err != nil {
+	//  log.Fatal(err)
+	//}
+	//log.Printf("saved \"%s\"", name)
 }
