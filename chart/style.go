@@ -37,8 +37,10 @@ var (
 		Color("1B1B1E"),
 	}
 
-	Red   = Color("ff3300")
-	Green = Color("339933")
+	Red    = Color("ff0000")
+	Green  = Color("00ff00")
+	Blue   = Color("0000ff")
+	Yellow = Color("ffff00")
 )
 
 func Color(hash string) color.Color {

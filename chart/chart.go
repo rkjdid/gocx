@@ -14,7 +14,7 @@ import (
 var (
 	p        *plot.Plot
 	plotters []plot.Plotter
-	legends  []string
+	signals  []plot.Plotter
 )
 
 func init() {
@@ -98,14 +98,14 @@ func AddSignal(signal strategy.Signal, y float64) {
 		panic(err)
 	}
 
+	s.GlyphStyle.Radius = vg.Length(5)
+	s.GlyphStyle.Shape = draw.PyramidGlyph{}
 	if signal.Action == strategy.Buy {
-		s.GlyphStyle.Shape = draw.BoxGlyph{}
 		s.GlyphStyle.Color = Green
 	} else {
-		s.GlyphStyle.Shape = draw.SquareGlyph{}
 		s.GlyphStyle.Color = Red
 	}
-	p.Add(s)
+	signals = append(signals, s)
 }
 
 func Save(dimX, dimY vg.Length, yGrid bool, file string) error {
@@ -123,8 +123,8 @@ func Save(dimX, dimY vg.Length, yGrid bool, file string) error {
 	for i := len(plotters) - 1; i >= 0; i-- {
 		p.Add(plotters[i])
 	}
-	for i := len(legends) - 1; i >= 0; i-- {
-
+	for _, s := range signals {
+		p.Add(s)
 	}
 	return p.Save(dimX, dimY, file)
 }

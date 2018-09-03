@@ -29,7 +29,7 @@ var (
 	x    = flag.String("x", "", "exchange to scrape from")
 	to   = flag.String("to", "", "to date: dd-mm-yyyy (defaults to time.Now())")
 	tf   = flag.String("tf", scraper.TfDay, "minute/hour/day")
-	agg  = flag.Int("agg", 1, "aggregate timeframe (`-tf hour -agg 2` for 2h candles)")
+	agg  = flag.Int("agg", 1, "aggregate timeframe (e.g. -tf hour -agg 2 for 2h candles)")
 
 	tfrom, tto time.Time
 	tformat    = "02-01-2006" // dd-mm-yyyy
