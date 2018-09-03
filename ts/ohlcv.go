@@ -58,7 +58,7 @@ func (o OHLCVs) XStep() float64 {
 
 func (o OHLCVs) ToXYer(data []float64) TimeSeries {
 	return TimeSeries{
-		data, o.X0(), o.XStep(),
+		data, o.X0() + o.XStep()*float64(len(o)-len(data)), o.XStep(),
 	}.CleanCopy()
 }
 

@@ -96,9 +96,9 @@ func main() {
 	// init chart and draw MAs
 	chart.SetTitles(fmt.Sprintf("%s:%s%s", *x, *bcur, *qcur), "", "")
 	chart.AddOHLCVs(data)
-	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), almaShort, almaSigma, almaOffset)),
+	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), almaShort, almaSigma, almaOffset)[almaShort:]),
 		fmt.Sprintf("alma%d", almaShort))
-	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), almaLong, almaSigma, almaOffset)),
+	chart.AddLine(data.ToXYer(talib.Alma(data.Close(), almaLong, almaSigma, almaOffset)[almaLong:]),
 		fmt.Sprintf("alma%d", almaLong))
 	h, _ := stats.Mean(stats.Float64Data(data.Close()))
 	chart.AddHorizontal(h, "mean")
