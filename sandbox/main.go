@@ -61,9 +61,6 @@ func init() {
 }
 
 func main() {
-	tfrom = time.Time{}.AddDate(2016, 0, 0)
-	tto = tfrom.AddDate(1, 0, 0)
-
 	data, err := scraper.FetchHistorical(*x, *bcur, *qcur, *tf, *agg, tfrom, tto)
 	if err != nil {
 		log.Fatal(err)
