@@ -19,6 +19,20 @@ func (o OHLCV) IsZero() bool {
 	return o.Volume == 0 && o.Open == 0 && o.Close == 0
 }
 
+func (o OHLCV) Sub(on OHLCV) time.Duration {
+	return time.Time(o.Timestamp).Sub(time.Time(on.Timestamp))
+}
+
+func (o OHLCV) IsNextTo(o0 OHLCV, tf time.Duration) bool {
+	return o.Sub(o0) >= time.Duration(float64(tf)*0.95) &&
+		o.Sub(o0) <= time.Duration(float64(tf)*1.05)
+}
+
+func (o0 OHLCV) IsPrevOf(o OHLCV, tf time.Duration) bool {
+	return o.Sub(o0) >= time.Duration(float64(tf)*0.95) &&
+		o.Sub(o0) <= time.Duration(float64(tf)*1.05)
+}
+
 type OHLCVs []OHLCV
 
 func (o OHLCVs) Range() (x0, xn, y0, yn float64) {

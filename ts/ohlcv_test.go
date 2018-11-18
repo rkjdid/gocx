@@ -1,6 +1,10 @@
 package ts
 
-import "testing"
+import (
+	"github.com/ccxt/ccxt/go/util"
+	"testing"
+	"time"
+)
 
 func TestOHLCV_IsZero(t *testing.T) {
 	var o OHLCV
@@ -10,6 +14,32 @@ func TestOHLCV_IsZero(t *testing.T) {
 	o.Volume = 1
 	if o.IsZero() {
 		t.Errorf("volume != 0 shouldn't be zero")
+	}
+}
+
+func TestOHLCV_IsNextTo(t *testing.T) {
+	t0 := time.Now()
+	c0 := OHLCV{
+		Timestamp: util.JSONTime(t0.Add(-time.Minute * 59)),
+	}
+	cn := OHLCV{
+		Timestamp: util.JSONTime(t0),
+	}
+	if !cn.IsNextTo(c0, time.Hour) {
+		t.Errorf("! %s NextTo %s", cn.Timestamp, c0.Timestamp)
+	}
+	if !c0.IsPrevOf(cn, time.Hour) {
+		t.Errorf("! %s PrevOf %s", c0.Timestamp, cn.Timestamp)
+	}
+
+	cz := OHLCV{
+		Timestamp: util.JSONTime(t0.Add(-time.Hour * 2)),
+	}
+	if cz.IsPrevOf(cn, time.Hour) {
+		t.Errorf("%s PrevOf %s", cz.Timestamp, cn.Timestamp)
+	}
+	if cz.IsNextTo(cn, time.Hour) {
+		t.Errorf("%s NextTo %s", cz.Timestamp, cn.Timestamp)
 	}
 }
 
