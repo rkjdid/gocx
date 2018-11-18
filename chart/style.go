@@ -9,6 +9,34 @@ import (
 	"sync"
 )
 
+var (
+	Buy = draw.GlyphStyle{
+		Color:  Green,
+		Shape:  draw.PyramidGlyph{},
+		Radius: vg.Length(1),
+	}
+	StrongBuy = draw.GlyphStyle{
+		Color:  Green,
+		Shape:  draw.PyramidGlyph{},
+		Radius: vg.Length(2),
+	}
+	Sell = draw.GlyphStyle{
+		Color:  Red,
+		Shape:  draw.PyramidGlyph{},
+		Radius: vg.Length(1),
+	}
+	StrongSell = draw.GlyphStyle{
+		Color:  Red,
+		Shape:  draw.PyramidGlyph{},
+		Radius: vg.Length(2),
+	}
+
+	GrayLine = draw.LineStyle{
+		Width: W1,
+		Color: LightGray,
+	}
+)
+
 const (
 	W1               = vg.Length(1)
 	W2               = vg.Length(2)
@@ -17,7 +45,7 @@ const (
 )
 
 var (
-	lineWidth = W2
+	lineWidth = W1
 	lineColor = 0
 	lineLock  = sync.Mutex{}
 
@@ -37,10 +65,11 @@ var (
 		Color("1B1B1E"),
 	}
 
-	Red    = Color("ff0000")
-	Green  = Color("00ff00")
-	Blue   = Color("0000ff")
-	Yellow = Color("ffff00")
+	Red       = Color("ff0000")
+	Green     = Color("00ff00")
+	Blue      = Color("0000ff")
+	Yellow    = Color("ffff00")
+	LightGray = Color("aaaaaa")
 )
 
 func Color(hash string) color.Color {
