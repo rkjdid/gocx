@@ -8,9 +8,12 @@ import (
 	"github.com/rkjdid/gocx/ts"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"time"
 )
+
+var client = http.DefaultClient
 
 const (
 	CryptoCompareAPI = "https://min-api.cryptocompare.com/data/histo"
@@ -80,15 +83,21 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		var ccResp CryptoCompareResponse
 		i++
 		q.Set("toTs", fmt.Sprint(to.Unix()))
-		q.Set("limit", fmt.Sprintf("%d", to.Sub(from)/d+1))
+		//q.Set("limit", fmt.Sprintf("%d", to.Sub(from)/d+1))
 
 		u.RawQuery = q.Encode()
 		if gocx.Debug {
 			log.Printf("GET %s", u.String())
 		}
-		resp, err := http.Get(u.String())
+		resp, err := client.Get(u.String())
 		if err != nil {
 			return nil, fmt.Errorf("couldn't retreive http data: %s", err)
+		}
+		if gocx.Debug {
+			buf, err := httputil.DumpResponse(resp, true)
+			if err == nil {
+				log.Println(string(buf))
+			}
 		}
 		err = json.NewDecoder(resp.Body).Decode(&ccResp)
 		if err != nil {
