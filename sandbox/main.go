@@ -131,7 +131,7 @@ func LoadHistorical(x, bcur, qcur string, tf string, agg int, from, to time.Time
 }
 
 func main() {
-	hist, err := LoadHistorical(*x, *bcur, *qcur, *tf, *agg, tfrom, tto)
+	hist1, err := LoadHistorical(*x, *bcur, *qcur, *tf, *agg, tfrom, tto)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -147,13 +147,9 @@ func main() {
 	// init & feed strategy
 	macd1 := strategy.NewMACD(12, 26, 9)
 	macd2 := strategy.NewMACD(12, 26, 9)
-	if hist.Timeframe > hist2.Timeframe {
-		h := hist
-		hist = hist2
-		hist2 = h
-		t := macd1
-		macd1 = macd2
-		macd2 = t
+	if hist1.Timeframe > hist2.Timeframe {
+		hist1, hist2 = hist2, hist1
+		macd1, macd2 = macd2, macd1
 	}
 
 	var k0 = 1000.0
@@ -163,7 +159,7 @@ func main() {
 
 	j := 0
 	var sig1, sig2, last strategy.Signal
-	for _, x := range hist.Data {
+	for _, x := range hist1.Data {
 		// are we closing ?
 		if pos != nil && pos.Active() {
 			potentialNet := pos.NetOnClose(x.Close)
@@ -238,7 +234,7 @@ func main() {
 	chart.NextLineTheme()
 	macd2.Draw()
 	cname := fmt.Sprintf("%sc%s%s.png", *prefix, *bcur, *qcur)
-	width := vg.Length(math.Max(float64(len(hist.Data)), 1200))
+	width := vg.Length(math.Max(float64(len(hist1.Data)), 1200))
 	height := width / 1.77
 
 	err = chart.Save(width, height, false, cname)
