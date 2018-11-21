@@ -3,6 +3,8 @@ package ts
 import (
 	"github.com/ccxt/ccxt/go/util"
 	"github.com/montanaflynn/stats"
+	"gonum.org/v1/plot/plotter"
+	"math"
 	"time"
 )
 
@@ -21,6 +23,10 @@ func (o OHLCV) IsZero() bool {
 
 func (o OHLCV) Sub(on OHLCV) time.Duration {
 	return time.Time(o.Timestamp).Sub(time.Time(on.Timestamp))
+}
+
+func (o OHLCV) IsAlmost(o0 OHLCV) bool {
+	return math.Abs(float64(o.Sub(o0))) <= float64(time.Minute*30)
 }
 
 func (o OHLCV) IsNextTo(o0 OHLCV, tf time.Duration) bool {
@@ -70,10 +76,13 @@ func (o OHLCVs) XStep() float64 {
 	return 0
 }
 
-func (o OHLCVs) ToXYer(data []float64) TimeSeries {
-	return TimeSeries{
-		data, o.X0() + o.XStep()*float64(len(o)-len(data)), o.XStep(),
-	}.CleanCopy()
+func (o OHLCVs) ToXYer(data ...[]float64) (ts []plotter.XYer) {
+	for _, v := range data {
+		ts = append(ts, TimeSeries{
+			v, o.X0() + o.XStep()*float64(len(o)-len(v)), o.XStep(),
+		}.CleanCopy())
+	}
+	return ts
 }
 
 // TrimLeft returns a slice with zero-elements removed from the beginning of o.
@@ -106,6 +115,9 @@ func (o OHLCVs) Clean() OHLCVs {
 	const brokenRatio = 1024
 	for i, v := range o {
 		for _, val := range []*float64{&v.Open, &v.High, &v.Low, &v.Close} {
+			if *val < 0 {
+				continue
+			}
 			if *val == 0 ||
 				(*val > brokenRatio*v.Open && *val > brokenRatio*v.Close) ||
 				(*val > brokenRatio*v.Low && *val > brokenRatio*v.High) {
