@@ -130,18 +130,18 @@ func LoadHistorical(x, bcur, qcur string, tf string, agg int, from, to time.Time
 	return &h, nil
 }
 
-func main() {
-	hist1, err := LoadHistorical(*x, *bcur, *qcur, *tf, *agg, tfrom, tto)
+func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from, to time.Time) error {
+	hist1, err := LoadHistorical(x, bcur, qcur, tf, agg, from, to)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	hist2, err := LoadHistorical(*x, *bcur, *qcur, *tf2, *agg2, tfrom, tto)
+	hist2, err := LoadHistorical(x, bcur, qcur, tf2, agg2, from, to)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// init chart
-	chart.SetTitles(fmt.Sprintf("%s:%s%s", *x, *bcur, *qcur), "", "")
+	chart.SetTitles(fmt.Sprintf("%s:%s%s", x, bcur, qcur), "", "")
 	chart.AddOHLCVs(hist2.Data)
 
 	// init & feed strategy
@@ -215,7 +215,7 @@ func main() {
 
 			// buy signal
 			if tt && (pos == nil || pos.State == position.Closed) {
-				pos = position.NewPosition(x.Timestamp.T(), *bcur, *qcur, position.Long)
+				pos = position.NewPosition(x.Timestamp.T(), bcur, qcur, position.Long)
 				pos.PaperBuyAt(k/x.Close, x.Close, x.Timestamp.T())
 				tradeCount.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				positions = append(positions, pos)
@@ -233,16 +233,23 @@ func main() {
 	macd1.Draw()
 	chart.NextLineTheme()
 	macd2.Draw()
-	cname := fmt.Sprintf("%sc%s%s.png", *prefix, *bcur, *qcur)
+	cname := fmt.Sprintf("%sc%s%s.png", *prefix, bcur, qcur)
 	width := vg.Length(math.Max(float64(len(hist1.Data)), 1200))
 	height := width / 1.77
 
 	err = chart.Save(width, height, false, cname)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Printf("saved \"%s\"", cname)
+	return nil
+}
 
+func main() {
+	err := Newave(*x, *bcur, *qcur, *tf, *agg, *tf2, *agg2, tfrom, tto)
+	if err != nil {
+		log.Fatalf("Newave %s%s: %s", *bcur, *qcur, err)
+	}
 	if *promServer {
 		<-make(chan int)
 	}
