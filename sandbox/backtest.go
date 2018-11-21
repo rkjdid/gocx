@@ -158,7 +158,7 @@ func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from
 	macd1.Draw()
 	chart.NextLineTheme()
 	macd2.Draw()
-	cname := fmt.Sprintf("%sc%s%s.png", *prefix, bcur, qcur)
+	cname := fmt.Sprintf("img/%sx%s%s.png", *prefix, bcur, qcur)
 	width := vg.Length(math.Max(float64(len(hist1.Data)), 1200))
 	height := width / 1.77
 
