@@ -1,16 +1,18 @@
 package scraper
 
 import (
+	"fmt"
 	"github.com/gregjones/httpcache"
 	"github.com/gregjones/httpcache/diskcache"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 var (
-	maxAge = "864000" // 10 day
+	cacher *diskcache.Cache
 )
 
 func init() {
@@ -26,21 +28,28 @@ func init() {
 		log.Printf("scraper: cache disabled: os.UserCacheDir: %s", err)
 
 	}
-	c := diskcache.New(cacheDir)
-	client = &http.Client{
+	cacher = diskcache.New(cacheDir)
+	client = CacheClient(time.Hour * 24 * 10)
+}
+
+func CacheClient(maxAge time.Duration) *http.Client {
+	if cacher == nil || maxAge == 0 {
+		return http.DefaultClient
+	}
+	return &http.Client{
 		Transport: Transport{
-			t:      httpcache.NewTransport(c),
-			MaxAge: maxAge,
+			t:      httpcache.NewTransport(cacher),
+			maxAge: fmt.Sprintf("%.0f", maxAge.Seconds()),
 		},
 	}
 }
 
 type Transport struct {
 	t      http.RoundTripper
-	MaxAge string
+	maxAge string
 }
 
 func (t Transport) RoundTrip(rq *http.Request) (*http.Response, error) {
-	rq.Header.Set("Cache-Control", "max-age="+t.MaxAge)
+	rq.Header.Set("Cache-Control", "max-age="+t.maxAge)
 	return t.t.RoundTrip(rq)
 }
