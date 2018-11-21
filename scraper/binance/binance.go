@@ -19,27 +19,27 @@ const (
 
 type Ticker struct {
 	Base, Quote        string
-	Symbol             string `json:"symbol"`
-	PriceChange        string `json:"priceChange"`
-	PriceChangePercent string `json:"priceChangePercent"`
-	WeightedAvgPrice   string `json:"weightedAvgPrice"`
-	PrevClosePrice     string `json:"prevClosePrice"`
-	LastPrice          string `json:"lastPrice"`
-	LastQty            string `json:"lastQty"`
-	BidPrice           string `json:"bidPrice"`
-	BidQty             string `json:"bidQty"`
-	AskPrice           string `json:"askPrice"`
-	AskQty             string `json:"askQty"`
-	OpenPrice          string `json:"openPrice"`
-	HighPrice          string `json:"highPrice"`
-	LowPrice           string `json:"lowPrice"`
-	Volume             string `json:"volume"`
-	QuoteVolume        string `json:"quoteVolume"`
-	OpenTime           int64  `json:"openTime"`
-	CloseTime          int64  `json:"closeTime"`
-	FirstID            int    `json:"firstId"`
-	LastID             int    `json:"lastId"`
-	Count              int    `json:"count"`
+	Symbol             string  `json:"symbol"`
+	PriceChange        string  `json:"priceChange"`
+	PriceChangePercent string  `json:"priceChangePercent"`
+	WeightedAvgPrice   string  `json:"weightedAvgPrice"`
+	PrevClosePrice     string  `json:"prevClosePrice"`
+	LastPrice          string  `json:"lastPrice"`
+	LastQty            string  `json:"lastQty"`
+	BidPrice           string  `json:"bidPrice"`
+	BidQty             string  `json:"bidQty"`
+	AskPrice           string  `json:"askPrice"`
+	AskQty             string  `json:"askQty"`
+	OpenPrice          string  `json:"openPrice"`
+	HighPrice          string  `json:"highPrice"`
+	LowPrice           string  `json:"lowPrice"`
+	Volume             float64 `json:"volume,string"`
+	QuoteVolume        float64 `json:"quoteVolume,string"`
+	OpenTime           int64   `json:"openTime"`
+	CloseTime          int64   `json:"closeTime"`
+	FirstID            int     `json:"firstId"`
+	LastID             int     `json:"lastId"`
+	Count              int     `json:"count"`
 }
 
 func ParseSymbol(sym string) (base, quote string) {
@@ -61,14 +61,14 @@ func (tvt TickersByVolumeDesc) Len() int {
 }
 
 func (tvt TickersByVolumeDesc) Less(i, j int) bool {
-	return tvt[i].Volume < tvt[j].Volume
+	return tvt[i].QuoteVolume > tvt[j].QuoteVolume
 }
 
 func (tvt TickersByVolumeDesc) Swap(i, j int) {
 	tvt[i], tvt[j] = tvt[j], tvt[i]
 }
 
-func FetchTopTickers() ([]Ticker, error) {
+func FetchTopTickers(baseFilter, quoteFilter string) ([]Ticker, error) {
 	client := scraper.CacheClient(time.Hour * 12)
 	resp, err := client.Get(API + TickerEndpoint)
 	if err != nil {
@@ -88,9 +88,15 @@ func FetchTopTickers() ([]Ticker, error) {
 	if gocx.Debug {
 		log.Printf("%d: %v", resp.StatusCode, tickers)
 	}
-	sort.Sort(TickersByVolumeDesc(tickers))
-	for i := range tickers {
-		tickers[i].Base, tickers[i].Quote = ParseSymbol(tickers[i].Symbol)
+
+	var filtered []Ticker
+	for _, t := range tickers {
+		t.Base, t.Quote = ParseSymbol(t.Symbol)
+		if (baseFilter != "" && t.Base != baseFilter) || (quoteFilter != "" && t.Quote != quoteFilter) {
+			continue
+		}
+		filtered = append(filtered, t)
 	}
-	return tickers, nil
+	sort.Sort(TickersByVolumeDesc(filtered))
+	return filtered, nil
 }
