@@ -40,9 +40,9 @@ func LoadHistorical(x, bcur, qcur string, tf string, agg int, from, to time.Time
 
 	h := Historical{
 		Data:      data,
-		To:        time.Time(data[0].Timestamp),
-		From:      time.Time(data[len(data)-1].Timestamp),
-		Timeframe: time.Duration(agg) * scraper.TfToDuration[tf],
+		To:        data.X0T(),
+		From:      data.XNT(),
+		Timeframe: data.XStepDuration(),
 		Exchange:  x, Base: bcur, Quote: qcur,
 	}
 	fmt.Println("loaded:", h)

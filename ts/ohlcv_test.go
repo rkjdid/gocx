@@ -144,3 +144,7 @@ func TestTimeSeries_Clean(t *testing.T) {
 		}
 	}
 }
+
+func TestOHLCVs_X0_XN_Y0_YN(t *testing.T) {
+	// todo
+}

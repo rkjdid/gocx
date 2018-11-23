@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/rkjdid/gocx/chart"
-	"github.com/rkjdid/gocx/position"
+	"github.com/rkjdid/gocx/risk"
 	"github.com/rkjdid/gocx/strategy"
 	"gonum.org/v1/plot/vg"
 	"log"
@@ -35,8 +35,8 @@ func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from
 
 	var k0 = 1000.0
 	var k = k0
-	var positions []*position.Position
-	var pos *position.Position
+	var positions []*risk.Position
+	var pos *risk.Position
 
 	j := 0
 	var sig1, sig2, last strategy.Signal
@@ -55,7 +55,7 @@ func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from
 				pos.PaperCloseAt(x.Close, x.Timestamp.T())
 			}
 
-			if pos.State == position.Closed {
+			if pos.State == risk.Closed {
 				tradeCount.WithLabelValues("sell", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				k += pos.Net()
 			}
@@ -90,14 +90,14 @@ func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from
 
 		tt := trigger.Action == strategy.Buy
 		if trigger != strategy.NoSignal && trigger.Action != last.Action {
-			//fmt.Printf("%4s @%5.2f - %s\n", trigger.Action, x.Close, time.Time(x.Timestamp).Format(tformatH))
-			chart.AddSignal(trigger.Time, tt, true, 0)
+			//chart.AddSignal(trigger.Time, tt, true, 0)
+			// todo print signals using a prometheus Collector via sigCount var
 			sigCount.WithLabelValues("newave", trigger.Action.String()).Inc()
 			last = trigger
 
-			// buy signal
-			if tt && (pos == nil || pos.State == position.Closed) {
-				pos = position.NewPosition(x.Timestamp.T(), bcur, qcur, position.Long)
+			// buy signal -> open position
+			if tt && (pos == nil || pos.State == risk.Closed) {
+				pos = risk.NewPosition(x.Timestamp.T(), bcur, qcur, risk.Long)
 				pos.PaperBuyAt(k/x.Close, x.Close, x.Timestamp.T())
 				tradeCount.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				positions = append(positions, pos)

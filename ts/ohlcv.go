@@ -47,16 +47,24 @@ func (o OHLCVs) Range() (x0, xn, y0, yn float64) {
 
 func (o OHLCVs) X0() float64 {
 	if len(o) >= 1 {
-		return float64(time.Time(o[0].Timestamp).Unix())
+		return float64(o.X0T().Unix())
 	}
 	return 0
 }
 
+func (o OHLCVs) X0T() time.Time {
+	return time.Time(time.Time(o[0].Timestamp))
+}
+
 func (o OHLCVs) XN() float64 {
 	if len(o) >= 1 {
-		return float64(time.Time(o[len(o)-1].Timestamp).Unix())
+		return float64(o.X0T().Unix())
 	}
 	return 0
+}
+
+func (o OHLCVs) XNT() time.Time {
+	return time.Time(time.Time(o[len(o)-1].Timestamp))
 }
 
 func (o OHLCVs) Y0() float64 {
@@ -71,9 +79,13 @@ func (o OHLCVs) YN() float64 {
 
 func (o OHLCVs) XStep() float64 {
 	if len(o) >= 2 {
-		return float64(time.Time(o[1].Timestamp).Unix() - time.Time(o[0].Timestamp).Unix())
+		return float64(o.XStepDuration().Seconds())
 	}
 	return 0
+}
+
+func (o OHLCVs) XStepDuration() time.Duration {
+	return time.Time(o[1].Timestamp).Sub(time.Time(o[0].Timestamp))
 }
 
 func (o OHLCVs) ToXYer(data ...[]float64) (ts []plotter.XYer) {
