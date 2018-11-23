@@ -70,6 +70,9 @@ func init() {
 			os.Exit(1)
 		}
 	}
+	if *qcur == "" {
+		*qcur = "BTC"
+	}
 	_, ok := scraper.TfToDuration[*tf]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "invalid timeframe \"%s\"\n", *tf)
@@ -85,19 +88,47 @@ func init() {
 }
 
 func main() {
-	tickers, err := binance.FetchTopTickers("", "BTC")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// monitor binance
+	//BinanceTopMarkets(20)
 
-	for _, v := range tickers[:20] {
-		err := Newave(*x, v.Base, v.Quote, *tf, *agg, *tf2, *agg2, tfrom, tto)
-		if err != nil {
-			log.Printf("Newave %s%s: %s", v.Base, v.Quote, err)
-		}
+	// print binance top pairs
+	PrintBinanceTop(0)
+
+	err := Newave(*x, *bcur, *qcur, *tf, *agg, *tf2, *agg2, tfrom, tto)
+	if err != nil {
+		log.Printf("Newave %s:%s%s - %s", *x, *bcur, *qcur, err)
 	}
 
 	if *promServer {
 		<-make(chan int)
+	}
+}
+
+func PrintBinanceTop(n int) {
+	tickers, err := binance.FetchTopTickers("", "BTC")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if n <= 0 {
+		n = len(tickers)
+	}
+	for _, t := range tickers[:n] {
+		fmt.Println(t.Symbol, t.QuoteVolume)
+	}
+}
+
+func BinanceTopMarkets(n int) {
+	tickers, err := binance.FetchTopTickers("", "BTC")
+	if err != nil {
+		log.Fatal(err)
+	}
+	if n <= 0 {
+		n = len(tickers)
+	}
+	for _, v := range tickers[:n] {
+		err := Newave(*x, v.Base, v.Quote, *tf, *agg, *tf2, *agg2, tfrom, tto)
+		if err != nil {
+			log.Printf("Newave %s:%s%s - %s", *x, v.Base, v.Quote, err)
+		}
 	}
 }
