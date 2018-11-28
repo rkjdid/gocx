@@ -2,10 +2,28 @@ package main
 
 import (
 	"fmt"
+	"github.com/rkjdid/gocx/risk"
 	"github.com/rkjdid/gocx/scraper"
 	"github.com/rkjdid/gocx/ts"
 	"time"
 )
+
+type Result struct {
+	Score     float64
+	Positions []*risk.Position
+}
+
+func (r Result) String() string {
+	var wins, loses int
+	for _, p := range r.Positions {
+		if p.Net() < 0 {
+			loses++
+		} else if p.Net() > 0 {
+			wins++
+		}
+	}
+	return fmt.Sprintf("score: %.2f%%, +pos: %d, -pos: %d", r.Score*100, wins, loses)
+}
 
 type Historical struct {
 	Data      ts.OHLCVs

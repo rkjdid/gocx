@@ -89,19 +89,29 @@ func init() {
 
 func main() {
 	// monitor binance
-	//BinanceTopMarkets(20)
+	//BacktestBinanceTopMarkets(20)
 
 	// print binance top pairs
-	PrintBinanceTop(0)
+	//PrintBinanceTop(0)
 
-	err := Newave(*x, *bcur, *qcur, *tf, *agg, *tf2, *agg2, tfrom, tto)
-	if err != nil {
-		log.Printf("Newave %s:%s%s - %s", *x, *bcur, *qcur, err)
-	}
+	//
+	BacktestOne(*bcur, *qcur)
 
 	if *promServer {
 		<-make(chan int)
 	}
+}
+
+func BacktestOne(bcur, qcur string) {
+	res, err := Newave(*x, bcur, qcur, *tf, *agg, *tf2, *agg2, tfrom, tto)
+	if err != nil {
+		log.Printf("Newave %s:%s%s - %s", *x, bcur, qcur, err)
+		return
+	}
+	for _, p := range res.Positions {
+		fmt.Println(p)
+	}
+	fmt.Println(res)
 }
 
 func PrintBinanceTop(n int) {
@@ -126,9 +136,6 @@ func BinanceTopMarkets(n int) {
 		n = len(tickers)
 	}
 	for _, v := range tickers[:n] {
-		err := Newave(*x, v.Base, v.Quote, *tf, *agg, *tf2, *agg2, tfrom, tto)
-		if err != nil {
-			log.Printf("Newave %s:%s%s - %s", *x, v.Base, v.Quote, err)
-		}
+		BacktestOne(v.Base, v.Quote)
 	}
 }

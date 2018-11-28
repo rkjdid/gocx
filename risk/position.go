@@ -51,7 +51,7 @@ type Position struct {
 	OpenTime  time.Time
 	CloseTime time.Time
 
-	Transactions []Transaction
+	Transactions []*Transaction
 }
 
 func NewPosition(t time.Time, base, quote string, direction Direction) *Position {
@@ -93,13 +93,13 @@ func (p Position) Net() float64 {
 	}
 }
 
-func (p *Position) NetOnClose(pr float64) float64 {
-	pp := *p
-	pp.PaperClose(pr)
-	return pp.Net()
+// NetOnClose will PaperClose and return Net on a copy of p, caller Position is unchanged.
+func (p Position) NetOnClose(pr float64) float64 {
+	p.PaperClose(pr)
+	return p.Net()
 }
 
-func (p *Position) AddTransaction(t Transaction) {
+func (p *Position) AddTransaction(t *Transaction) {
 	p.Transactions = append(p.Transactions, t)
 	if p.Direction == t.Direction {
 		p.AvgEntry = ((p.AvgEntry * p.Total) + (t.Price * t.Quantity)) /
@@ -123,7 +123,7 @@ func (p *Position) PaperBuy(q, pr float64) {
 
 func (p *Position) PaperBuyAt(q, pr float64, t time.Time) {
 	p.TotalFees += p.FeesRate * (q * pr)
-	p.AddTransaction(Transaction{
+	p.AddTransaction(&Transaction{
 		Direction: Buy,
 		Quantity:  q,
 		Price:     pr,
@@ -137,7 +137,7 @@ func (p *Position) PaperSell(q, pr float64) {
 
 func (p *Position) PaperSellAt(q, pr float64, t time.Time) {
 	p.TotalFees += p.FeesRate * (q * pr)
-	p.AddTransaction(Transaction{
+	p.AddTransaction(&Transaction{
 		Direction: Sell,
 		Quantity:  q,
 		Price:     pr,

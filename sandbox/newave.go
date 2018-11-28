@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rkjdid/gocx"
 	"github.com/rkjdid/gocx/chart"
 	"github.com/rkjdid/gocx/risk"
 	"github.com/rkjdid/gocx/strategy"
@@ -11,19 +12,37 @@ import (
 	"time"
 )
 
-func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from, to time.Time) error {
-	hist1, err := LoadHistorical(x, bcur, qcur, tf, agg, from, to)
+func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from, to time.Time) (*Result, error) {
+	return NewWaveOpts{
+		Exchange: x, Base: bcur, Quote: qcur, Tf1: tf, Agg1: agg, Tf2: tf2, Agg2: agg2, From: from, To: to,
+	}.Backtest()
+}
+
+type NewWaveOpts struct {
+	Exchange    string
+	Base, Quote string
+	From, To    time.Time
+
+	Tf1, Tf2     string
+	Agg1, Agg2   int
+	Opts1, Opts2 strategy.MACDOpts
+}
+
+func (n NewWaveOpts) Backtest() (*Result, error) {
+	hist1, err := LoadHistorical(n.Exchange, n.Base, n.Quote, n.Tf1, n.Agg1, n.From, n.To)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	hist2, err := LoadHistorical(x, bcur, qcur, tf2, agg2, from, to)
+	hist2, err := LoadHistorical(n.Exchange, n.Base, n.Quote, n.Tf2, n.Agg2, n.From, n.To)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// init chart
-	chart.SetTitles(fmt.Sprintf("%s:%s%s", x, bcur, qcur), "", "")
-	chart.AddOHLCVs(hist2.Data)
+	if gocx.Chart {
+		chart.SetTitles(fmt.Sprintf("%s:%s%s", n.Exchange, n.Base, n.Quote), "", "")
+		chart.AddOHLCVs(hist2.Data)
+	}
 
 	// init & feed strategy
 	macd1 := strategy.NewMACD(12, 26, 9)
@@ -33,9 +52,9 @@ func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from
 		macd1, macd2 = macd2, macd1
 	}
 
-	var k0 = 1000.0
+	var k0 = 1.0
 	var k = k0
-	var positions []*risk.Position
+	var result = &Result{}
 	var pos *risk.Position
 
 	j := 0
@@ -75,54 +94,53 @@ func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from
 		}
 
 		// print signals individually
-		t1 := sig1.Action == strategy.Buy
 		if sig1 != strategy.NoSignal {
-			_ = t1
-			//chart.AddSignal(sig1.Time, t1, false, 10000)
+			//if gocx.Chart {
+			//	chart.AddSignal(sig1.Time, sig1.Action == strategy.Buy, false, 10000)
+			//}
 			sigCount.WithLabelValues("fast", sig1.Action.String()).Inc()
 		}
-		t2 := sig2.Action == strategy.Buy
 		if sig2 != strategy.NoSignal {
-			_ = t2
-			//chart.AddSignal(sig2.Time, t2, true, 20000)
+			//if gocx.Chart {
+			//	chart.AddSignal(sig2.Time, sig2.Action == strategy.Buy, true, 20000)
+			//}
 			sigCount.WithLabelValues("slow", sig1.Action.String()).Inc()
 		}
 
 		tt := trigger.Action == strategy.Buy
 		if trigger != strategy.NoSignal && trigger.Action != last.Action {
-			//chart.AddSignal(trigger.Time, tt, true, 0)
-			// todo print signals using a prometheus Collector via sigCount var
+			if gocx.Chart {
+				chart.AddSignal(trigger.Time, tt, true, 0)
+			}
 			sigCount.WithLabelValues("newave", trigger.Action.String()).Inc()
 			last = trigger
 
 			// buy signal -> open position
 			if tt && (pos == nil || pos.State == risk.Closed) {
-				pos = risk.NewPosition(x.Timestamp.T(), bcur, qcur, risk.Long)
+				pos = risk.NewPosition(x.Timestamp.T(), n.Base, n.Quote, risk.Long)
 				pos.PaperBuyAt(k/x.Close, x.Close, x.Timestamp.T())
 				tradeCount.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
-				positions = append(positions, pos)
+				result.Positions = append(result.Positions, pos)
 			}
 		}
 	}
-
-	for _, p := range positions {
-		fmt.Println(p)
-	}
-	fmt.Println()
-	fmt.Printf("initial: %f     net: %.2f    work: %.2f%%\n", k0, k, 100*(k/k0-1))
+	result.Score = k/k0 - 1
 
 	// draw chart
-	macd1.Draw()
-	chart.NextLineTheme()
-	macd2.Draw()
-	cname := fmt.Sprintf("img/%sx%s%s.png", *prefix, bcur, qcur)
-	width := vg.Length(math.Max(float64(len(hist1.Data)), 1200))
-	height := width / 1.77
+	if gocx.Chart {
+		macd1.Draw()
+		chart.NextLineTheme()
+		macd2.Draw()
+		cname := fmt.Sprintf("img/%sn.Exchange%s%s.png", *prefix, n.Base, n.Quote)
+		width := vg.Length(math.Max(float64(len(hist1.Data)), 1200))
+		height := width / 1.77
 
-	err = chart.Save(width, height, false, cname)
-	if err != nil {
-		return err
+		err = chart.Save(width, height, false, cname)
+		if err != nil {
+			return result, err
+		}
+		log.Printf("saved \"%s\"", cname)
 	}
-	log.Printf("saved \"%s\"", cname)
-	return nil
+
+	return result, nil
 }

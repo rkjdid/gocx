@@ -9,10 +9,14 @@ import (
 
 const MaxLookback = 16000
 
-type MACD struct {
-	Data                     ts.OHLCVs
+type MACDOpts struct {
 	Fast, Slow, SignalPeriod int
-	LastSignal               Signal
+}
+
+type MACD struct {
+	MACDOpts
+	Data       ts.OHLCVs
+	LastSignal Signal
 
 	cacheOHLCV                        ts.OHLCV
 	cacheMACD, cacheSignal, cacheHist []float64
@@ -20,7 +24,11 @@ type MACD struct {
 
 func NewMACD(f, s, signalPeriod int) *MACD {
 	return &MACD{
-		Fast: f, Slow: s, SignalPeriod: signalPeriod,
+		MACDOpts: MACDOpts{
+			Fast:         f,
+			Slow:         s,
+			SignalPeriod: signalPeriod,
+		},
 		Data: make(ts.OHLCVs, 0, MaxLookback),
 	}
 }
