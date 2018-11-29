@@ -12,9 +12,10 @@ import (
 	"time"
 )
 
-func Newave(x, bcur, qcur string, tf string, agg int, tf2 string, agg2 int, from, to time.Time) (*Result, error) {
+func Newave(x, bcur, qcur string, tf string, agg int, slowOpts, fastOpts strategy.MACDOpts, from, to time.Time) (*Result, error) {
 	return NewWaveOpts{
-		Exchange: x, Base: bcur, Quote: qcur, Tf1: tf, Agg1: agg, Tf2: tf2, Agg2: agg2, From: from, To: to,
+		Exchange: x, Base: bcur, Quote: qcur, Tf: tf, Agg: agg, From: from, To: to,
+		MACDSlow: slowOpts, MACDFast: fastOpts,
 	}.Backtest()
 }
 
@@ -22,18 +23,14 @@ type NewWaveOpts struct {
 	Exchange    string
 	Base, Quote string
 	From, To    time.Time
+	Tf          string
+	Agg         int
 
-	Tf1, Tf2     string
-	Agg1, Agg2   int
-	Opts1, Opts2 strategy.MACDOpts
+	MACDSlow, MACDFast strategy.MACDOpts
 }
 
 func (n NewWaveOpts) Backtest() (*Result, error) {
-	hist1, err := LoadHistorical(n.Exchange, n.Base, n.Quote, n.Tf1, n.Agg1, n.From, n.To)
-	if err != nil {
-		return nil, err
-	}
-	hist2, err := LoadHistorical(n.Exchange, n.Base, n.Quote, n.Tf2, n.Agg2, n.From, n.To)
+	hist, err := LoadHistorical(n.Exchange, n.Base, n.Quote, n.Tf, n.Agg, n.From, n.To)
 	if err != nil {
 		return nil, err
 	}
@@ -41,25 +38,26 @@ func (n NewWaveOpts) Backtest() (*Result, error) {
 	// init chart
 	if gocx.Chart {
 		chart.SetTitles(fmt.Sprintf("%s:%s%s", n.Exchange, n.Base, n.Quote), "", "")
-		chart.AddOHLCVs(hist2.Data)
+		chart.AddOHLCVs(hist.Data)
 	}
 
+	// TODO use only 1 TF and use factor of TF
+
 	// init & feed strategy
-	macd1 := strategy.NewMACD(12, 26, 9)
-	macd2 := strategy.NewMACD(12, 26, 9)
-	if hist1.Timeframe > hist2.Timeframe {
-		hist1, hist2 = hist2, hist1
-		macd1, macd2 = macd2, macd1
-	}
+	macdFast := n.MACDFast.NewMACD()
+	macdSlow := n.MACDSlow.NewMACD()
+	//if hist.Timeframe > hist2.Timeframe {
+	//	hist, hist2 = hist2, hist
+	//	macdFast, macdSlow = macdSlow, macdFast
+	//}
 
 	var k0 = 1.0
 	var k = k0
 	var result = &Result{}
 	var pos *risk.Position
 
-	j := 0
-	var sig1, sig2, last strategy.Signal
-	for _, x := range hist1.Data {
+	var sigFast, sigSlow, last strategy.Signal
+	for _, x := range hist.Data {
 		// Positions management ?
 		// are we closing ?
 		if pos != nil && pos.Active() {
@@ -80,31 +78,28 @@ func (n NewWaveOpts) Backtest() (*Result, error) {
 			}
 		}
 
-		sig1 = macd1.AddTick(x)
-		if len(hist2.Data) > j+1 && x.Timestamp.T().After(hist2.Data[j+1].Timestamp.T()) {
-			j += 1
-			sig2 = macd2.AddTick(hist2.Data[j])
-		}
+		sigFast = macdFast.AddTick(x)
+		sigSlow = macdSlow.AddTick(x)
 
 		var trigger strategy.Signal
-		if sig1 != strategy.NoSignal && macd2.LastSignal.Action == sig1.Action {
-			trigger = sig1
-		} else if sig2 != strategy.NoSignal && macd1.LastSignal.Action == sig2.Action {
-			trigger = sig2
+		if sigFast != strategy.NoSignal && macdSlow.LastSignal.Action == sigFast.Action {
+			trigger = sigFast
+		} else if sigSlow != strategy.NoSignal && macdFast.LastSignal.Action == sigSlow.Action {
+			trigger = sigSlow
 		}
 
 		// print signals individually
-		if sig1 != strategy.NoSignal {
+		if sigFast != strategy.NoSignal {
 			//if gocx.Chart {
-			//	chart.AddSignal(sig1.Time, sig1.Action == strategy.Buy, false, 10000)
+			//	chart.AddSignal(sigFast.Time, sigFast.Action == strategy.Buy, false, 10000)
 			//}
-			sigCount.WithLabelValues("fast", sig1.Action.String()).Inc()
+			sigCount.WithLabelValues("fast", sigFast.Action.String()).Inc()
 		}
-		if sig2 != strategy.NoSignal {
+		if sigSlow != strategy.NoSignal {
 			//if gocx.Chart {
-			//	chart.AddSignal(sig2.Time, sig2.Action == strategy.Buy, true, 20000)
+			//	chart.AddSignal(sigSlow.Time, sigSlow.Action == strategy.Buy, true, 20000)
 			//}
-			sigCount.WithLabelValues("slow", sig1.Action.String()).Inc()
+			sigCount.WithLabelValues("slow", sigFast.Action.String()).Inc()
 		}
 
 		tt := trigger.Action == strategy.Buy
@@ -128,11 +123,11 @@ func (n NewWaveOpts) Backtest() (*Result, error) {
 
 	// draw chart
 	if gocx.Chart {
-		macd1.Draw()
+		macdFast.Draw()
 		chart.NextLineTheme()
-		macd2.Draw()
+		macdSlow.Draw()
 		cname := fmt.Sprintf("img/%sn.Exchange%s%s.png", *prefix, n.Base, n.Quote)
-		width := vg.Length(math.Max(float64(len(hist1.Data)), 1200))
+		width := vg.Length(math.Max(float64(len(hist.Data)), 1200))
 		height := width / 1.77
 
 		err = chart.Save(width, height, false, cname)

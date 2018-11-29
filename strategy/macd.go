@@ -13,6 +13,10 @@ type MACDOpts struct {
 	Fast, Slow, SignalPeriod int
 }
 
+func (opts MACDOpts) NewMACD() *MACD {
+	return NewMACD(opts.Fast, opts.Slow, opts.SignalPeriod)
+}
+
 type MACD struct {
 	MACDOpts
 	Data       ts.OHLCVs

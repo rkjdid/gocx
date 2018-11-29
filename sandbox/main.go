@@ -11,6 +11,7 @@ import (
 	"github.com/rkjdid/gocx/chart"
 	"github.com/rkjdid/gocx/scraper"
 	"github.com/rkjdid/gocx/scraper/binance"
+	"github.com/rkjdid/gocx/strategy"
 	"log"
 	"net/http"
 	"os"
@@ -104,7 +105,15 @@ func init() {
 	}
 }
 
+var (
+	macdSlow, macdFast strategy.MACDOpts
+)
+
 func main() {
+	ratio := 4
+	macdSlow = strategy.MACDOpts{12, 26, 9}
+	macdFast = strategy.MACDOpts{ratio * 12, ratio * 26, 9}
+
 	switch *run {
 	case RunBacktestOne:
 		BacktestOne(*bcur, *qcur)
@@ -123,7 +132,7 @@ func main() {
 }
 
 func BacktestOne(bcur, qcur string) {
-	res, err := Newave(*x, bcur, qcur, *tf, *agg, *tf2, *agg2, tfrom, tto)
+	res, err := Newave(*x, bcur, qcur, *tf, *agg, macdSlow, macdFast, tfrom, tto)
 	if err != nil {
 		log.Printf("Newave %s:%s%s - %s", *x, bcur, qcur, err)
 		return
