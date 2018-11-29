@@ -25,7 +25,7 @@ var (
 	_ = stats.ExponentialRegression
 	_ = json.Marshal
 
-	run        = flag.String("run", RunPrintTop, "bot action")
+	run        = flag.String("run", RunPrintTop, runHelpText())
 	n          = flag.Int("n", 10, "print/backtest top n markets")
 	bcur       = flag.String("base", "BTC", "base cur")
 	qcur       = flag.String("quote", "USD", "quote cur")
@@ -33,9 +33,7 @@ var (
 	x          = flag.String("x", "", "exchange to scrape from")
 	to         = flag.String("to", "", "to date: dd-mm-yyyy (defaults to time.Now())")
 	tf         = flag.String("tf", scraper.TfDay, "minute/hour/day")
-	tf2        = flag.String("tf2", scraper.TfDay, "minute/hour/day")
 	agg        = flag.Int("agg", 1, "aggregate tf (e.g. -tf hour -agg 2 for 2h candles)")
-	agg2       = flag.Int("agg2", 1, "aggregate tf2")
 	prefix     = flag.String("prefix", "", "prefix")
 	promBind   = flag.String("prometheus-bind", ":8080", "prometheus bind")
 	promHandle = flag.String("prometheus-handle", "/prometheus", "prometheus handle")
