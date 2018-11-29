@@ -24,6 +24,8 @@ var (
 	_ = stats.ExponentialRegression
 	_ = json.Marshal
 
+	run        = flag.String("run", RunPrintTop, "bot action")
+	n          = flag.Int("n", 10, "print/backtest top n markets")
 	bcur       = flag.String("base", "BTC", "base cur")
 	qcur       = flag.String("quote", "USD", "quote cur")
 	from       = flag.String("from", "03-01-2009", "from date: dd-mm-yyyy")
@@ -42,6 +44,21 @@ var (
 	tformat    = "02-01-2006" // dd-mm-yyyy
 	tformatH   = "02-01-2006 15:04"
 )
+
+const (
+	RunBacktestTop = "backtestTop"
+	RunBacktestOne = "backtestOne"
+	RunPrintTop    = "printTop"
+)
+
+func runHelpText() string {
+	return fmt.Sprintf("bot action: %v",
+		[]string{
+			RunBacktestTop,
+			RunBacktestOne,
+			RunPrintTop,
+		})
+}
 
 var (
 	sigCount = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -88,14 +105,17 @@ func init() {
 }
 
 func main() {
-	// monitor binance
-	//BacktestBinanceTopMarkets(20)
-
-	// print binance top pairs
-	//PrintBinanceTop(0)
-
-	//
-	BacktestOne(*bcur, *qcur)
+	switch *run {
+	case RunBacktestOne:
+		BacktestOne(*bcur, *qcur)
+	case RunBacktestTop:
+		BacktestTop(*n)
+	case RunPrintTop:
+		PrintBinanceTop(*n)
+	default:
+		s, _ := os.Executable()
+		log.Fatalf("unsuported command: %s. <%s> -h", *run, s)
+	}
 
 	if *promServer {
 		<-make(chan int)
@@ -127,7 +147,7 @@ func PrintBinanceTop(n int) {
 	}
 }
 
-func BinanceTopMarkets(n int) {
+func BacktestTop(n int) {
 	tickers, err := binance.FetchTopTickers("", "BTC")
 	if err != nil {
 		log.Fatal(err)
