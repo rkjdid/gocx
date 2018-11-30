@@ -37,7 +37,6 @@ func (t Transaction) Cost() float64 {
 }
 
 type Position struct {
-	Id          int
 	State       State
 	Base, Quote string
 	Direction   Direction

@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"github.com/mediocregopher/radix.v2/redis"
 	"github.com/rkjdid/gocx"
+	"github.com/rkjdid/gocx/backtest"
 	"github.com/rkjdid/gocx/chart"
 	"github.com/rkjdid/gocx/risk"
 	"github.com/rkjdid/gocx/strategy"
@@ -12,11 +17,9 @@ import (
 	"time"
 )
 
-func Newave(x, bcur, qcur string, tf string, agg int, slowOpts, fastOpts strategy.MACDOpts, from, to time.Time) (*Result, error) {
-	return NewWaveOpts{
-		Exchange: x, Base: bcur, Quote: qcur, Tf: tf, Agg: agg, From: from, To: to,
-		MACDSlow: slowOpts, MACDFast: fastOpts,
-	}.Backtest()
+type NewWaveResult struct {
+	Config NewWaveOpts
+	backtest.Result
 }
 
 type NewWaveOpts struct {
@@ -29,8 +32,16 @@ type NewWaveOpts struct {
 	MACDSlow, MACDFast strategy.MACDOpts
 }
 
-func (n NewWaveOpts) Backtest() (*Result, error) {
-	hist, err := LoadHistorical(n.Exchange, n.Base, n.Quote, n.Tf, n.Agg, n.From, n.To)
+func Newave(x, bcur, qcur string, tf string, agg int, slowOpts, fastOpts strategy.MACDOpts, from, to time.Time) (
+	*NewWaveResult, error) {
+	return NewWaveOpts{
+		Exchange: x, Base: bcur, Quote: qcur, Tf: tf, Agg: agg, From: from, To: to,
+		MACDSlow: slowOpts, MACDFast: fastOpts,
+	}.Backtest()
+}
+
+func (n NewWaveOpts) Backtest() (*NewWaveResult, error) {
+	hist, err := backtest.LoadHistorical(n.Exchange, n.Base, n.Quote, n.Tf, n.Agg, n.From, n.To)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +64,7 @@ func (n NewWaveOpts) Backtest() (*Result, error) {
 
 	var k0 = 1.0
 	var k = k0
-	var result = &Result{}
+	var result = &NewWaveResult{Config: n}
 	var pos *risk.Position
 
 	var sigFast, sigSlow, last strategy.Signal
@@ -138,4 +149,57 @@ func (n NewWaveOpts) Backtest() (*Result, error) {
 	}
 
 	return result, nil
+}
+
+// DB / Data
+
+func (r NewWaveResult) JSON() ([]byte, error) {
+	var b bytes.Buffer
+	err := json.NewEncoder(&b).Encode(r)
+	return b.Bytes(), err
+}
+
+func (r NewWaveResult) Digest() (id string, data []byte, err error) {
+	data, err = r.JSON()
+	if err != nil {
+		return
+	}
+	shasum := sha256.Sum256(data)
+	id = fmt.Sprintf("newave:%s%s:%x", r.Config.Base, r.Config.Quote, shasum[:10])
+	return
+}
+
+func (r NewWaveResult) Save(db *redis.Client) (err error) {
+	id, data, err := r.Digest()
+	if err != nil {
+		return err
+	}
+	err = db.Cmd("multi").Err
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = db.Cmd("discard")
+		} else {
+			err = db.Cmd("exec").Err
+		}
+	}()
+	err = db.Cmd("set", id, data).Err
+	if err != nil {
+		return err
+	}
+	return db.Cmd("zadd", "results", r.ScorePerDay(), id).Err
+}
+
+func LoadJSON(db *redis.Client, id string, v interface{}) error {
+	resp := db.Cmd("get", id)
+	if resp.Err != nil {
+		return resp.Err
+	}
+	b, err := resp.Bytes()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, v)
 }

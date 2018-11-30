@@ -5,9 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"github.com/markcheno/go-talib"
+	"github.com/mediocregopher/radix.v2/redis"
 	"github.com/montanaflynn/stats"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rkjdid/gocx"
 	"github.com/rkjdid/gocx/chart"
 	"github.com/rkjdid/gocx/scraper"
 	"github.com/rkjdid/gocx/scraper/binance"
@@ -41,7 +43,6 @@ var (
 
 	tfrom, tto time.Time
 	tformat    = "02-01-2006" // dd-mm-yyyy
-	tformatH   = "02-01-2006 15:04"
 )
 
 const (
@@ -108,6 +109,12 @@ var (
 )
 
 func main() {
+	var err error
+	gocx.Db, err = redis.Dial("tcp", "localhost:6379")
+	if err != nil {
+		log.Fatal("error init db:", err)
+	}
+
 	ratio := 4
 	macdSlow = strategy.MACDOpts{12, 26, 9}
 	macdFast = strategy.MACDOpts{ratio * 12, ratio * 26, 9}
@@ -139,6 +146,12 @@ func BacktestOne(bcur, qcur string) {
 		fmt.Println(p)
 	}
 	fmt.Println(res)
+
+	// save to redis
+	err = res.Save(gocx.Db)
+	if err != nil {
+		log.Println("redis: error saving backtest result:", err)
+	}
 }
 
 func PrintBinanceTop(n int) {

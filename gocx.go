@@ -1,10 +1,15 @@
 package gocx
 
-import "flag"
+import (
+	"flag"
+	"github.com/mediocregopher/radix.v2/redis"
+)
 
 var (
 	Debug bool
 	Chart bool
+
+	Db *redis.Client
 )
 
 func init() {
