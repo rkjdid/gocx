@@ -3,7 +3,6 @@ package binance
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rkjdid/gocx"
 	"github.com/rkjdid/gocx/scraper"
 	"log"
 	"net/http/httputil"
@@ -74,7 +73,7 @@ func FetchTopTickers(baseFilter, quoteFilter string) ([]Ticker, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't retreive http data: %s", err)
 	}
-	if gocx.Debug {
+	if scraper.Debug {
 		buf, err := httputil.DumpResponse(resp, true)
 		if err == nil {
 			log.Println(string(buf))
@@ -85,7 +84,7 @@ func FetchTopTickers(baseFilter, quoteFilter string) ([]Ticker, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't decode body: %s", err)
 	}
-	if gocx.Debug {
+	if scraper.Debug {
 		log.Printf("%d: %v", resp.StatusCode, tickers)
 	}
 

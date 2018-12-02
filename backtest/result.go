@@ -44,7 +44,7 @@ func (r Result) String() string {
 			wins++
 		}
 	}
-	return fmt.Sprintf("score: %.2f%%, +pos: %d, -pos: %d", r.Score*100, wins, loses)
+	return fmt.Sprintf("net/day: %5.2f%%, +pos: %2d, -pos: %2d", r.ScorePerDay()*100, wins, loses)
 }
 
 func (r Result) JSON() ([]byte, error) {

@@ -1,6 +1,7 @@
 package strategy
 
 import (
+	"fmt"
 	"github.com/markcheno/go-talib"
 	"github.com/rkjdid/gocx/chart"
 	"github.com/rkjdid/gocx/ts"
@@ -78,4 +79,8 @@ func (m *MACD) Compute() ([]float64, []float64, []float64) {
 func (m *MACD) Draw() error {
 	chart.AddLines([]string{"macd", "signal"}, m.Data.ToXYer(m.cacheMACD, m.cacheSignal)...)
 	return nil
+}
+
+func (m MACDOpts) String() string {
+	return fmt.Sprintf("(%d, %d, %d)", m.Fast, m.Slow, m.SignalPeriod)
 }

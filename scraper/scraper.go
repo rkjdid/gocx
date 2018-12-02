@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ccxt/ccxt/go/util"
-	"github.com/rkjdid/gocx"
 	"github.com/rkjdid/gocx/ts"
 	"log"
 	"net/http"
@@ -13,7 +12,15 @@ import (
 	"time"
 )
 
-var client = http.DefaultClient
+var (
+	Debug        = false
+	Client       = http.DefaultClient
+	TfToDuration = map[string]time.Duration{
+		TfMinute: time.Minute,
+		TfHour:   time.Hour,
+		TfDay:    time.Hour * 24,
+	}
+)
 
 const (
 	CryptoCompareAPI = "https://min-api.cryptocompare.com/data/histo"
@@ -21,12 +28,6 @@ const (
 	TfHour           = "hour"
 	TfDay            = "day"
 )
-
-var TfToDuration = map[string]time.Duration{
-	TfMinute: time.Minute,
-	TfHour:   time.Hour,
-	TfDay:    time.Hour * 24,
-}
 
 type CryptoCompareResponse struct {
 	Response          string        `json:"Response"`
@@ -86,14 +87,14 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		//q.Set("limit", fmt.Sprintf("%d", to.Sub(from)/d+1))
 
 		u.RawQuery = q.Encode()
-		if gocx.Debug {
+		if Debug {
 			log.Printf("GET %s", u.String())
 		}
-		resp, err := client.Get(u.String())
+		resp, err := Client.Get(u.String())
 		if err != nil {
 			return nil, fmt.Errorf("couldn't retreive http data: %s", err)
 		}
-		if gocx.Debug {
+		if Debug {
 			buf, err := httputil.DumpResponse(resp, true)
 			if err == nil {
 				log.Println(string(buf))
@@ -103,7 +104,7 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		if err != nil {
 			return nil, fmt.Errorf("couldn't decode body: %s", err)
 		}
-		if gocx.Debug {
+		if Debug {
 			log.Printf("%d: %s", resp.StatusCode, ccResp)
 		}
 		if ccResp.Response != "Success" {

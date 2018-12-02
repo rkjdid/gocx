@@ -29,7 +29,7 @@ func init() {
 
 	}
 	cacher = diskcache.New(cacheDir)
-	client = CacheClient(time.Hour * 24 * 10)
+	Client = CacheClient(time.Hour * 24 * 10)
 }
 
 func CacheClient(maxAge time.Duration) *http.Client {
