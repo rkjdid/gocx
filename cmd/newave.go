@@ -126,10 +126,8 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 		return nil, err
 	}
 
-	// set actual n.From if unsef
-	if n.From.Equal(time.Time{}) {
-		n.From = histFast.From
-	}
+	// set actual n.From after LoadHistorical
+	n.From = histFast.From
 
 	// init chart
 	if chartFlag {

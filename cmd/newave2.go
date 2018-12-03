@@ -97,10 +97,15 @@ func Newave2(x, bcur, qcur string, tf backtest.Timeframe, fastOpts, slowOpts str
 }
 
 func (n Newave2Config) Backtest() (*Newave2Result, error) {
+	if !n.Timeframe.IsValid() {
+		return nil, fmt.Errorf("invalid tf: %s", n.Timeframe)
+	}
 	hist, err := backtest.LoadHistorical(n.Exchange, n.Base, n.Quote, n.Timeframe, n.From, n.To)
 	if err != nil {
 		return nil, err
 	}
+	// set actual n.From after LoadHistorical
+	n.From = hist.From
 
 	// init chart
 	if chartFlag {
