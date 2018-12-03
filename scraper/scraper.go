@@ -57,10 +57,6 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 	if aggregate < 1 {
 		aggregate = 1
 	}
-	var greedyFrom bool
-	if from.Equal(time.Time{}) {
-		greedyFrom = true
-	}
 	if from.After(to) {
 		return nil, fmt.Errorf("from is after to date")
 	}
@@ -88,7 +84,6 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		var ccResp CryptoCompareResponse
 		i++
 		q.Set("toTs", fmt.Sprint(to.Unix()))
-		//q.Set("limit", fmt.Sprintf("%d", to.Sub(from)/d+1))
 
 		u.RawQuery = q.Encode()
 		if Debug {
@@ -106,8 +101,8 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		}
 		err = json.NewDecoder(resp.Body).Decode(&ccResp)
 		if err != nil {
-			if greedyFrom && len(data) > 0 {
-				// ignore error in greedymode if we have at least some data
+			if len(data) > 0 {
+				// ignore error just send what we have if we have something
 				return data, nil
 			}
 			return nil, fmt.Errorf("couldn't decode body: %s", err)
