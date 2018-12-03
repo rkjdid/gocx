@@ -11,10 +11,6 @@ type Strategy interface {
 	AddTick(ts.OHLCV) Signal
 }
 
-type Drawable interface {
-	Draw(ts.OHLCV) error
-}
-
 type Signal struct {
 	Time     time.Time
 	Action   Action
