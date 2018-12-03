@@ -82,5 +82,5 @@ func (m *MACD) Draw() error {
 }
 
 func (m MACDOpts) String() string {
-	return fmt.Sprintf("(%d, %d, %d)", m.Fast, m.Slow, m.SignalPeriod)
+	return fmt.Sprintf("%d, %d, %d", m.Fast, m.Slow, m.SignalPeriod)
 }
