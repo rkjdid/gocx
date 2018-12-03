@@ -1,6 +1,6 @@
 package db
 
 type Driver interface {
-	Save(v Digester) (err error)
-	LoadJSON(id string, v interface{})
+	Save(v Digester) error
+	LoadJSON(id string, v interface{}) error
 }
