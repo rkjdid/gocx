@@ -17,22 +17,25 @@ import (
 	"time"
 )
 
-type Newave2Config struct {
+type NewaveConfig struct {
 	backtest.CommonConfig
 
+	TimeframeSlow      backtest.Timeframe
 	MACDFast, MACDSlow strategy.MACDOpts
 }
 
-type Newave2Result struct {
-	Config Newave2Config
+type NewaveResult struct {
+	Config NewaveConfig
 	backtest.Result
 }
 
 var (
-	newave2Cmd = TraverseRunHooks(&cobra.Command{
-		Use:   "newave2",
-		Short: "Newave strategy v2",
-		Long:  `Newave2 relies on 2 MACD for the same timeframe, when both are green, buy asset`,
+	newaveCmd = TraverseRunHooks(&cobra.Command{
+		Use:   "newave",
+		Short: "Newave strategy original",
+		Long: `Newave relies on MACD1(tf1) and MACD2(tf2), when both are green, buy asset
+
+Usually MACD1 & MACD2 config are the same but they can differ..`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			switch len(args) {
 			case 0:
@@ -45,15 +48,19 @@ var (
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
-				Newave2Top(n)
+				NewaveTop(n)
 			} else if len(args) == 2 {
-				Newave2One(args[0], args[1])
+				NewaveOne(args[0], args[1])
 			}
 		},
 	})
 )
 
-func Newave2Top(n int) {
+func init() {
+	newaveCmd.LocalFlags().StringVar(&tf2, "tf2", "", tfFlagHelper())
+}
+
+func NewaveTop(n int) {
 	tickers, err := binance.FetchTopTickers("", "BTC")
 	if err != nil {
 		log.Fatal(err)
@@ -62,17 +69,16 @@ func Newave2Top(n int) {
 		n = len(tickers)
 	}
 	for _, v := range tickers[:n] {
-		Newave2One(v.Base, v.Quote)
+		NewaveOne(v.Base, v.Quote)
 	}
 }
 
-func Newave2One(bcur, qcur string) {
-	ratio := 4
+func NewaveOne(bcur, qcur string) {
 	macd1 := strategy.MACDOpts{12, 16, 9}
-	macd2 := strategy.MACDOpts{ratio * 12, ratio * 26, 9}
-	res, err := Newave2(x, bcur, qcur, ttf, macd1, macd2, tfrom, tto)
+	macd2 := macd1
+	res, err := Newave(x, bcur, qcur, ttf, ttf2, macd1, macd2, tfrom, tto)
 	if err != nil {
-		log.Printf("Newave2 %s:%s%s - %s", x, bcur, qcur, err)
+		log.Printf("Newave %s:%s%s - %s", x, bcur, qcur, err)
 		return
 	}
 	for _, p := range res.Positions {
@@ -87,39 +93,66 @@ func Newave2One(bcur, qcur string) {
 	}
 }
 
-func Newave2(x, bcur, qcur string, tf backtest.Timeframe, fastOpts, slowOpts strategy.MACDOpts, from, to time.Time) (
-	*Newave2Result, error) {
-	return Newave2Config{
+func Newave(x, bcur, qcur string,
+	tf, tf2 backtest.Timeframe,
+	macdFast, macdSlow strategy.MACDOpts,
+	from, to time.Time) (
+	*NewaveResult, error) {
+	return NewaveConfig{
 		CommonConfig: backtest.CommonConfig{
-			Exchange: x, Base: bcur, Quote: qcur, Timeframe: tf, From: from, To: to},
-		MACDFast: fastOpts, MACDSlow: slowOpts,
+			Exchange: x,
+			Base:     bcur, Quote: qcur, Timeframe: tf, From: from, To: to,
+		},
+		TimeframeSlow: tf2,
+		MACDFast:      macdFast,
+		MACDSlow:      macdSlow,
 	}.Backtest()
 }
 
-func (n Newave2Config) Backtest() (*Newave2Result, error) {
-	hist, err := backtest.LoadHistorical(n.Exchange, n.Base, n.Quote, n.Timeframe, n.From, n.To)
+func (n NewaveConfig) Backtest() (*NewaveResult, error) {
+	if !n.Timeframe.IsValid() {
+		return nil, fmt.Errorf("invalid tf: %s", n.Timeframe)
+	}
+	if !n.TimeframeSlow.IsValid() {
+		return nil, fmt.Errorf("invalid tf2: %s", n.TimeframeSlow)
+	}
+
+	histFast, err := backtest.LoadHistorical(n.Exchange, n.Base, n.Quote, n.Timeframe, n.From, n.To)
 	if err != nil {
 		return nil, err
+	}
+	histSlow, err := backtest.LoadHistorical(n.Exchange, n.Base, n.Quote, n.TimeframeSlow, n.From, n.To)
+	if err != nil {
+		return nil, err
+	}
+
+	// set actual n.From if unsef
+	if n.From.Equal(time.Time{}) {
+		n.From = histFast.From
 	}
 
 	// init chart
 	if chartFlag {
 		chart.SetTitles(fmt.Sprintf("%s:%s%s", n.Exchange, n.Base, n.Quote), "", "")
-		chart.AddOHLCVs(hist.Data)
+		chart.AddOHLCVs(histSlow.Data)
 	}
 
 	// init & feed strategy
 	macdFast := n.MACDFast.NewMACD()
 	macdSlow := n.MACDSlow.NewMACD()
-	// todo swap fast <-> slow if needed
+	if histFast.Timeframe.ToDuration() > histSlow.Timeframe.ToDuration() {
+		histFast, histSlow = histSlow, histFast
+		macdFast, macdSlow = macdSlow, macdFast
+	}
 
 	var k0 = 1.0
 	var k = k0
-	var result = &Newave2Result{Config: n}
+	var result = NewaveResult{Config: n}
 	var pos *risk.Position
 
-	var sigFast, sigSlow, last strategy.Signal
-	for _, x := range hist.Data {
+	j := 0
+	var sig1, sig2, last strategy.Signal
+	for _, x := range histFast.Data {
 		// Positions management ?
 		// are we closing ?
 		if pos != nil && pos.Active() {
@@ -140,22 +173,25 @@ func (n Newave2Config) Backtest() (*Newave2Result, error) {
 			}
 		}
 
-		sigFast = macdFast.AddTick(x)
-		sigSlow = macdSlow.AddTick(x)
+		sig1 = macdFast.AddTick(x)
+		if len(histSlow.Data) > j+1 && x.Timestamp.T().After(histSlow.Data[j+1].Timestamp.T()) {
+			j += 1
+			sig2 = macdSlow.AddTick(histSlow.Data[j])
+		}
 
 		var trigger strategy.Signal
-		if sigFast != strategy.NoSignal && macdSlow.LastSignal.Action == sigFast.Action {
-			trigger = sigFast
-		} else if sigSlow != strategy.NoSignal && macdFast.LastSignal.Action == sigSlow.Action {
-			trigger = sigSlow
+		if sig1 != strategy.NoSignal && macdSlow.LastSignal.Action == sig1.Action {
+			trigger = sig1
+		} else if sig2 != strategy.NoSignal && macdFast.LastSignal.Action == sig2.Action {
+			trigger = sig2
 		}
 
 		// print signals individually
-		if sigFast != strategy.NoSignal {
-			sigCount.WithLabelValues("fast", sigFast.Action.String()).Inc()
+		if sig1 != strategy.NoSignal {
+			sigCount.WithLabelValues("fast", sig1.Action.String()).Inc()
 		}
-		if sigSlow != strategy.NoSignal {
-			sigCount.WithLabelValues("slow", sigFast.Action.String()).Inc()
+		if sig2 != strategy.NoSignal {
+			sigCount.WithLabelValues("slow", sig1.Action.String()).Inc()
 		}
 
 		tt := trigger.Action == strategy.Buy
@@ -163,7 +199,7 @@ func (n Newave2Config) Backtest() (*Newave2Result, error) {
 			if chartFlag {
 				chart.AddSignal(trigger.Time, tt, true, 0)
 			}
-			sigCount.WithLabelValues("newave2", trigger.Action.String()).Inc()
+			sigCount.WithLabelValues("newave", trigger.Action.String()).Inc()
 			last = trigger
 
 			// buy signal -> open position
@@ -175,28 +211,29 @@ func (n Newave2Config) Backtest() (*Newave2Result, error) {
 			}
 		}
 	}
+	result.UpdateScore()
 
 	// draw chart
 	if chartFlag {
 		macdFast.Draw()
 		chart.NextLineTheme()
 		macdSlow.Draw()
-		cname := fmt.Sprintf("img/newave2_%s%s.png", n.Base, n.Quote)
-		width := vg.Length(math.Max(float64(len(hist.Data)), 1200))
+		cname := fmt.Sprintf("img/newave_%s%s.png", n.Base, n.Quote)
+		width := vg.Length(math.Max(float64(len(histFast.Data)), 1200))
 		height := width / 1.77
 
 		err = chart.Save(width, height, false, cname)
 		if err != nil {
-			return result, err
+			return &result, err
 		}
 		log.Printf("saved \"%s\"", cname)
 	}
 
-	return result, nil
+	return &result, nil
 }
 
 // Digest is db.Digester implementation with json data and a id-hash.
-func (r Newave2Result) Digest() (id string, data []byte, err error) {
+func (r NewaveResult) Digest() (id string, data []byte, err error) {
 	var b bytes.Buffer
 	err = json.NewEncoder(&b).Encode(r)
 	if err != nil {
@@ -204,18 +241,18 @@ func (r Newave2Result) Digest() (id string, data []byte, err error) {
 	}
 	data = b.Bytes()
 	shasum := sha256.Sum256(data)
-	id = fmt.Sprintf("newave2:%s%s:%x", r.Config.Base, r.Config.Quote, shasum[:10])
+	id = fmt.Sprintf("newave:%s%s:%x", r.Config.Base, r.Config.Quote, shasum[:10])
 	return
 }
 
-func (n Newave2Config) String() string {
-	return fmt.Sprintf("%s:%8s - tf: %s - %s to %s - macd1(%s) macd2(%s)",
+func (n NewaveConfig) String() string {
+	return fmt.Sprintf("%s:%8s - tf: %s - %s to %s - macd(%s, %s) & macd(%s, %s)",
 		n.Exchange, fmt.Sprint(n.Base, n.Quote), n.Timeframe,
 		n.From.Format("02/01/06"), n.To.Format("02/01/2006"),
-		n.MACDFast, n.MACDSlow,
+		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
 	)
 }
 
-func (r Newave2Result) String() string {
+func (r NewaveResult) String() string {
 	return fmt.Sprintf("%s - %s", r.Config, r.Result)
 }
