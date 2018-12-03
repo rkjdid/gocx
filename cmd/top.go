@@ -6,6 +6,7 @@ import (
 	"github.com/rkjdid/gocx/scraper/binance"
 	"github.com/spf13/cobra"
 	"log"
+	"strings"
 )
 
 var (
@@ -37,16 +38,29 @@ var (
 				return
 			}
 			for i, v := range strats {
-				var result Newave2Result
 				id, err := v.Str()
 				if err != nil {
 					log.Println("v.Str():", err)
 					continue
 				}
-				err = db.LoadJSON(id, &result)
-				if err != nil {
-					log.Println("LoadJSON:", err)
-					continue
+
+				var result interface{}
+				if strings.Index(id, "newave:") != -1 {
+					var nwr NewaveResult
+					err = db.LoadJSON(id, &nwr)
+					if err != nil {
+						log.Println("LoadJSON:", err)
+						continue
+					}
+					result = nwr
+				} else if strings.Index(id, "newave2:") != -1 {
+					var nw2r Newave2Result
+					err = db.LoadJSON(id, &nw2r)
+					if err != nil {
+						log.Println("LoadJSON:", err)
+						continue
+					}
+					result = nw2r
 				}
 				fmt.Printf("%3d/  %s\n", i+1, result)
 			}

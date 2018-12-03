@@ -244,8 +244,8 @@ func (r NewaveResult) Digest() (id string, data []byte, err error) {
 }
 
 func (n NewaveConfig) String() string {
-	return fmt.Sprintf("%s:%8s - tf: %s - %s to %s - macd(%s, %s) & macd(%s, %s)",
-		n.Exchange, fmt.Sprint(n.Base, n.Quote), n.Timeframe,
+	return fmt.Sprintf("newave  %8s - tf: %s - %s to %s - macd(%s, %s) & macd(%s, %s)",
+		fmt.Sprint(n.Base, n.Quote), n.Timeframe,
 		n.From.Format("02/01/06"), n.To.Format("02/01/2006"),
 		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
 	)
