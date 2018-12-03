@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/mediocregopher/radix.v2/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rkjdid/gocx/backtest"
 	"github.com/rkjdid/gocx/chart"
@@ -18,6 +17,21 @@ import (
 	"math"
 	"time"
 )
+
+type Newave2Config struct {
+	Exchange    string
+	Base, Quote string
+	From, To    time.Time
+	Tf          string
+	Agg         int
+
+	MACDFast, MACDSlow strategy.MACDOpts
+}
+
+type Newave2Result struct {
+	Config Newave2Config
+	backtest.Result
+}
 
 var (
 	newave2Cmd = &cobra.Command{
@@ -65,9 +79,9 @@ func BacktestOneNewave2(bcur, qcur string) {
 	ratio := 4
 	macd1 := strategy.MACDOpts{12, 16, 9}
 	macd2 := strategy.MACDOpts{ratio * 12, ratio * 26, 9}
-	res, err := Newave(x, bcur, qcur, tf, agg, macd1, macd2, tfrom, tto)
+	res, err := Newave2(x, bcur, qcur, tf, agg, macd1, macd2, tfrom, tto)
 	if err != nil {
-		log.Printf("Newave %s:%s%s - %s", x, bcur, qcur, err)
+		log.Printf("Newave2 %s:%s%s - %s", x, bcur, qcur, err)
 		return
 	}
 	for _, p := range res.Positions {
@@ -76,30 +90,15 @@ func BacktestOneNewave2(bcur, qcur string) {
 	fmt.Println(res)
 
 	// save to redis
-	err = res.Save(db)
+	err = db.Save(res)
 	if err != nil {
 		log.Println("redis: error saving backtest result:", err)
 	}
 }
 
-type NewWaveResult struct {
-	Config NewWaveOpts
-	backtest.Result
-}
-
-type NewWaveOpts struct {
-	Exchange    string
-	Base, Quote string
-	From, To    time.Time
-	Tf          string
-	Agg         int
-
-	MACDFast, MACDSlow strategy.MACDOpts
-}
-
 var (
 	sigCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "signal", Help: "various signals",
+		Name: "signal", Help: "signals",
 	}, []string{"name", "action"})
 
 	tradeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -107,15 +106,15 @@ var (
 	}, []string{"direction", "quantity", "price"})
 )
 
-func Newave(x, bcur, qcur string, tf string, agg int, fastOpts, slowOpts strategy.MACDOpts, from, to time.Time) (
-	*NewWaveResult, error) {
-	return NewWaveOpts{
+func Newave2(x, bcur, qcur string, tf string, agg int, fastOpts, slowOpts strategy.MACDOpts, from, to time.Time) (
+	*Newave2Result, error) {
+	return Newave2Config{
 		Exchange: x, Base: bcur, Quote: qcur, Tf: tf, Agg: agg, From: from, To: to,
 		MACDFast: fastOpts, MACDSlow: slowOpts,
 	}.Backtest()
 }
 
-func (n NewWaveOpts) Backtest() (*NewWaveResult, error) {
+func (n *Newave2Config) Backtest() (*Newave2Result, error) {
 	hist, err := backtest.LoadHistorical(n.Exchange, n.Base, n.Quote, n.Tf, n.Agg, n.From, n.To)
 	if err != nil {
 		return nil, err
@@ -134,7 +133,7 @@ func (n NewWaveOpts) Backtest() (*NewWaveResult, error) {
 
 	var k0 = 1.0
 	var k = k0
-	var result = &NewWaveResult{Config: n}
+	var result = &Newave2Result{Config: *n}
 	var pos *risk.Position
 
 	var sigFast, sigSlow, last strategy.Signal
@@ -182,7 +181,7 @@ func (n NewWaveOpts) Backtest() (*NewWaveResult, error) {
 			if chartFlag {
 				chart.AddSignal(trigger.Time, tt, true, 0)
 			}
-			sigCount.WithLabelValues("newave", trigger.Action.String()).Inc()
+			sigCount.WithLabelValues("newave2", trigger.Action.String()).Inc()
 			last = trigger
 
 			// buy signal -> open position
@@ -194,14 +193,13 @@ func (n NewWaveOpts) Backtest() (*NewWaveResult, error) {
 			}
 		}
 	}
-	result.Score = k/k0 - 1
 
 	// draw chart
 	if chartFlag {
 		macdFast.Draw()
 		chart.NextLineTheme()
 		macdSlow.Draw()
-		cname := fmt.Sprintf("img/n.Exchange%s%s.png", n.Base, n.Quote)
+		cname := fmt.Sprintf("img/a%s%s.png", n.Base, n.Quote)
 		width := vg.Length(math.Max(float64(len(hist.Data)), 1200))
 		height := width / 1.77
 
@@ -215,8 +213,20 @@ func (n NewWaveOpts) Backtest() (*NewWaveResult, error) {
 	return result, nil
 }
 
-// DB / Data
-func (n NewWaveOpts) String() string {
+// Digest is db.Digester implementation with json data and a id-hash.
+func (r Newave2Result) Digest() (id string, data []byte, err error) {
+	var b bytes.Buffer
+	err = json.NewEncoder(&b).Encode(r)
+	if err != nil {
+		return
+	}
+	data = b.Bytes()
+	shasum := sha256.Sum256(data)
+	id = fmt.Sprintf("newave2:%s%s:%x", r.Config.Base, r.Config.Quote, shasum[:10])
+	return
+}
+
+func (n Newave2Config) String() string {
 	return fmt.Sprintf("%s:%8s - tf: %d %s - %s to %s - macd1%s macd2%s",
 		n.Exchange, fmt.Sprint(n.Base, n.Quote), n.Agg, n.Tf,
 		n.From.Format("02/01/06"), n.To.Format("02/01/2006"),
@@ -224,57 +234,6 @@ func (n NewWaveOpts) String() string {
 	)
 }
 
-func (r NewWaveResult) String() string {
+func (r Newave2Result) String() string {
 	return fmt.Sprintf("%s - %s", r.Config, r.Result)
-}
-
-func (r NewWaveResult) JSON() ([]byte, error) {
-	var b bytes.Buffer
-	err := json.NewEncoder(&b).Encode(r)
-	return b.Bytes(), err
-}
-
-func (r NewWaveResult) Digest() (id string, data []byte, err error) {
-	data, err = r.JSON()
-	if err != nil {
-		return
-	}
-	shasum := sha256.Sum256(data)
-	id = fmt.Sprintf("newave:%s%s:%x", r.Config.Base, r.Config.Quote, shasum[:10])
-	return
-}
-
-func (r NewWaveResult) Save(db *redis.Client) (err error) {
-	id, data, err := r.Digest()
-	if err != nil {
-		return err
-	}
-	err = db.Cmd("MULTI").Err
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			_ = db.Cmd("DISCARD")
-		} else {
-			err = db.Cmd("EXEC").Err
-		}
-	}()
-	err = db.Cmd("SET", id, data).Err
-	if err != nil {
-		return err
-	}
-	return db.Cmd("ZADD", "results", r.ScorePerDay(), id).Err
-}
-
-func LoadJSON(db *redis.Client, id string, v interface{}) error {
-	resp := db.Cmd("GET", id)
-	if resp.Err != nil {
-		return resp.Err
-	}
-	b, err := resp.Bytes()
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(b, v)
 }

@@ -1,26 +1,18 @@
 package backtest
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/rkjdid/gocx/risk"
-	"github.com/rkjdid/util"
 	"time"
 )
 
 type Result struct {
-	Score     float64
 	Positions []*risk.Position
+	Score     float64
 }
 
-func (r *Result) UpdateScore() float64 {
-	for _, p := range r.Positions {
-		r.Score += p.Net()
-	}
-	return r.Score
-}
-
-func (r Result) ScorePerDay() float64 {
+// ZScore implements db.ZScorer. It returns r.Score / day.
+func (r Result) ZScore() float64 {
 	sz := len(r.Positions)
 	if r.Score == 0 && sz > 0 {
 		r.UpdateScore()
@@ -35,6 +27,13 @@ func (r Result) ScorePerDay() float64 {
 	return 0
 }
 
+func (r *Result) UpdateScore() float64 {
+	for _, p := range r.Positions {
+		r.Score += p.Net()
+	}
+	return r.Score
+}
+
 func (r Result) String() string {
 	var wins, loses int
 	for _, p := range r.Positions {
@@ -44,11 +43,5 @@ func (r Result) String() string {
 			wins++
 		}
 	}
-	return fmt.Sprintf("net/day: %5.2f%%, +pos: %2d, -pos: %2d", r.ScorePerDay()*100, wins, loses)
-}
-
-func (r Result) JSON() ([]byte, error) {
-	var b bytes.Buffer
-	err := util.WriteJson(r, &b)
-	return b.Bytes(), err
+	return fmt.Sprintf("net/day: %5.2f%%, +pos: %2d, -pos: %2d", r.ZScore()*100, wins, loses)
 }

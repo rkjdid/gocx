@@ -12,7 +12,7 @@ var (
 	topCmd = &cobra.Command{
 		Use:   "top",
 		Short: "Display top items",
-		Long:  `Display best scoring strategies in db or binance top markets`,
+		Long:  `Display best scoring strategies in redisConn or binance top markets`,
 	}
 
 	strategiesCmd = &cobra.Command{
@@ -20,7 +20,7 @@ var (
 		Short: "Display best scoring backtest executions",
 		Long:  `ZREVRANGE on the sorted set holding strat backtest and display corresponding results`,
 		Run: func(cmd *cobra.Command, args []string) {
-			resp := db.Cmd("ZREVRANGE", "results", 0, n-1)
+			resp := db.Conn.Cmd("ZREVRANGE", "results", 0, n-1)
 			if resp.Err != nil {
 				log.Println("redis:", resp.Err)
 				return
@@ -31,13 +31,13 @@ var (
 				return
 			}
 			for i, v := range strats {
-				var result NewWaveResult
+				var result Newave2Result
 				id, err := v.Str()
 				if err != nil {
 					log.Println("v.Str():", err)
 					continue
 				}
-				err = LoadJSON(db, id, &result)
+				err = db.LoadJSON(id, &result)
 				if err != nil {
 					log.Println("LoadJSON:", err)
 					continue

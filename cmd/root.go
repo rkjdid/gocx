@@ -5,6 +5,7 @@ import (
 	"github.com/mediocregopher/radix.v2/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	gocx "github.com/rkjdid/gocx/db"
 	"github.com/spf13/cobra"
 	"log"
 	"net/http"
@@ -12,7 +13,8 @@ import (
 
 var (
 	debug      bool
-	db         *redis.Client
+	db         *gocx.RedisDriver
+	redisAddr  string
 	promBind   string
 	promHandle string
 	promServer bool
@@ -23,14 +25,18 @@ var (
 		Short: "gocryptox",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			var err error
-			db, err = redis.Dial("tcp", "localhost:6379")
+			// init db connection
+			redisConn, err := redis.Dial("tcp", redisAddr)
 			if err != nil {
 				log.Fatalln("redis dial:", err)
 			}
+			db = &gocx.RedisDriver{Conn: redisConn}
+
+			// init prometheus
 			prometheus.MustRegister(sigCount, tradeCount)
 			if promServer {
 				http.Handle(promHandle, promhttp.Handler())
-				fmt.Printf("localhost%s%s\n", promBind, promHandle)
+				fmt.Printf("%s%s\n", promBind, promHandle)
 				go func() {
 					log.Fatal("http listen:", http.ListenAndServe(promBind, nil))
 				}()
@@ -53,6 +59,7 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
+	rootCmd.PersistentFlags().StringVar(&redisAddr, "redis", "localhost:6379", "redis server location")
 	rootCmd.PersistentFlags().StringVar(&promBind, "prometheus-bind", ":8080", "prometheus bind")
 	rootCmd.PersistentFlags().StringVar(&promHandle, "prometheus-handle", "/prometheus", "prometheus handle")
 	rootCmd.PersistentFlags().BoolVar(&promServer, "prometheus-server", false, "enable prometheus webserver")
