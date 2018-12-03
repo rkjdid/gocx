@@ -8,12 +8,8 @@ import (
 )
 
 type Historical struct {
-	Data      ts.OHLCVs
-	From      time.Time
-	To        time.Time
-	Timeframe time.Duration
-
-	Exchange, Base, Quote string
+	CommonConfig
+	Data ts.OHLCVs
 }
 
 func (h Historical) String() string {
@@ -27,8 +23,8 @@ func (h Historical) String() string {
 		h.From.Format(tformatH), h.To.Format(tformatH))
 }
 
-func LoadHistorical(x, bcur, qcur string, tf string, agg int, from, to time.Time) (*Historical, error) {
-	data, err := scraper.FetchHistorical(x, bcur, qcur, tf, agg, from, to)
+func LoadHistorical(x, bcur, qcur string, tf Timeframe, from, to time.Time) (*Historical, error) {
+	data, err := scraper.FetchHistorical(x, bcur, qcur, tf.Unit, tf.N, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -40,11 +36,14 @@ func LoadHistorical(x, bcur, qcur string, tf string, agg int, from, to time.Time
 	}
 
 	h := Historical{
-		Data:      data,
-		To:        data.X0T(),
-		From:      data.XNT(),
-		Timeframe: data.XStepDuration(),
-		Exchange:  x, Base: bcur, Quote: qcur,
+		CommonConfig: CommonConfig{
+			To:        data.XNT(),
+			From:      data.X0T(),
+			Timeframe: tf,
+			Exchange:  x,
+			Base:      bcur, Quote: qcur,
+		},
+		Data: data,
 	}
 	fmt.Println("loaded:", h)
 	return &h, nil
