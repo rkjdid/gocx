@@ -5,7 +5,9 @@ type Digester interface {
 	Digest() (id string, data []byte, err error)
 }
 
-type ZScore interface {
+type ZScorer interface {
+	Digester
+
 	// ZScore must return a score per day.
 	ZScore() float64
 }

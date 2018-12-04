@@ -81,13 +81,9 @@ func Newave2One(bcur, qcur string) {
 	fmt.Println(res)
 
 	// save to redis
-	id, err := db.Save(res)
+	err = db.SaveZScorer(res, "results")
 	if err != nil {
 		log.Println("db: error saving backtest result:", err)
-	}
-	err = db.ZADD("results", id, res.ZScore())
-	if err != nil {
-		log.Println("db: error zadding backtest result:", err)
 	}
 }
 
