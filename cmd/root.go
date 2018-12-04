@@ -15,7 +15,7 @@ import (
 var (
 	debug      bool
 	useNopDb   bool
-	db         _db.Driver
+	db         *_db.RedisDriver
 	redisAddr  string
 	promBind   string
 	promHandle string
@@ -30,15 +30,11 @@ var (
 			scraper.Debug = debug
 
 			// init db connection
-			if useNopDb {
-				db = _db.NopDriver{}
-			} else /* redis */ {
-				redisConn, err := redis.Dial("tcp", redisAddr)
-				if err != nil {
-					log.Fatalln("redis dial:", err)
-				}
-				db = &_db.RedisDriver{Conn: redisConn}
+			redisConn, err := redis.Dial("tcp", redisAddr)
+			if err != nil {
+				log.Fatalln("redis dial:", err)
 			}
+			db = &_db.RedisDriver{Conn: redisConn}
 
 			// init prometheus
 			prometheus.MustRegister(sigCount, tradeCount)
@@ -67,7 +63,6 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
-	rootCmd.PersistentFlags().BoolVar(&useNopDb, "nodb", false, "disable database usage")
 	rootCmd.PersistentFlags().StringVar(&redisAddr, "redis", "localhost:6379", "redis server location")
 	rootCmd.PersistentFlags().StringVar(&promBind, "prometheus-bind", ":8080", "prometheus bind")
 	rootCmd.PersistentFlags().StringVar(&promHandle, "prometheus-handle", "/prometheus", "prometheus handle")

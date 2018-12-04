@@ -21,19 +21,15 @@ func (d *RedisDriver) LoadJSON(id string, v interface{}) error {
 	return json.Unmarshal(b, v)
 }
 
-func (d *RedisDriver) Save(v Digester) (err error) {
+func (d *RedisDriver) Save(v Digester) (id string, err error) {
 	id, data, err := v.Digest()
 	if err != nil {
-		return err
+		return id, err
 	}
 	// set value
-	err = d.Conn.Cmd("SET", id, data).Err
-	if err != nil {
-		return err
-	}
-	// zadd in sorted set
-	if x, ok := v.(ZScore); ok {
-		return d.Conn.Cmd("ZADD", "results", x.ZScore(), id).Err
-	}
-	return nil
+	return id, d.Conn.Cmd("SET", id, data).Err
+}
+
+func (d *RedisDriver) ZADD(key string, id string, score float64) error {
+	return d.Conn.Cmd("ZADD", key, score, id).Err
 }
