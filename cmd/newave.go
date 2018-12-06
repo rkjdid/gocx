@@ -171,7 +171,7 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 			}
 
 			if pos.State == risk.Closed {
-				tradeCount.WithLabelValues("sell", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
+				trades.WithLabelValues("sell", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				k += pos.Net()
 			}
 		}
@@ -191,10 +191,10 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 
 		// print signals individually
 		if sig1 != strategy.NoSignal {
-			sigCount.WithLabelValues("fast", sig1.Action.String()).Inc()
+			signals.WithLabelValues("fast", sig1.Action.String()).Inc()
 		}
 		if sig2 != strategy.NoSignal {
-			sigCount.WithLabelValues("slow", sig1.Action.String()).Inc()
+			signals.WithLabelValues("slow", sig1.Action.String()).Inc()
 		}
 
 		tt := trigger.Action == strategy.Buy
@@ -202,14 +202,14 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 			if chartFlag {
 				chart.AddSignal(trigger.Time, tt, true, 0)
 			}
-			sigCount.WithLabelValues("newave", trigger.Action.String()).Inc()
+			signals.WithLabelValues("newave", trigger.Action.String()).Inc()
 			last = trigger
 
 			// buy signal -> open position
 			if tt && (pos == nil || pos.State == risk.Closed) {
 				pos = risk.NewPosition(x.Timestamp.T(), n.Base, n.Quote, risk.Long)
 				pos.PaperBuyAt(k/x.Close, x.Close, x.Timestamp.T())
-				tradeCount.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
+				trades.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				result.Positions = append(result.Positions, pos)
 			}
 		}

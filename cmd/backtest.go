@@ -21,11 +21,11 @@ var (
 	tformat = "02-01-2006"
 
 	// prometheus metrics
-	sigCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	signals = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "signal", Help: "signals",
 	}, []string{"name", "action"})
 
-	tradeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	trades = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "trade", Help: "trades",
 	}, []string{"direction", "quantity", "price"})
 )

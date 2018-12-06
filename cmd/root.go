@@ -37,7 +37,7 @@ var (
 			db = &_db.RedisDriver{Conn: redisConn}
 
 			// init prometheus
-			prometheus.MustRegister(sigCount, tradeCount)
+			prometheus.MustRegister(signals, trades)
 			if promServer {
 				http.Handle(promHandle, promhttp.Handler())
 				fmt.Printf("%s%s\n", promBind, promHandle)
