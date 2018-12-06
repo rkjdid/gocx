@@ -26,16 +26,15 @@ func (d *RedisDriver) Save(v Digester) (id string, err error) {
 	if err != nil {
 		return id, err
 	}
-	// set value
 	return id, d.Conn.Cmd("SET", id, data).Err
 }
 
-func (d *RedisDriver) SaveZScorer(z ZScorer, key string) error {
-	id, err := d.Save(z)
+func (d *RedisDriver) SaveZScorer(item ZScorer, zkey string) error {
+	id, err := d.Save(item)
 	if err != nil {
 		return err
 	}
-	return d.ZADD(key, id, z.ZScore())
+	return d.ZADD(zkey, id, item.ZScore())
 }
 
 func (d *RedisDriver) ZADD(key string, id string, score float64) error {

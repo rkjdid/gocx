@@ -1,8 +1,7 @@
 package db
 
 type Digester interface {
-	// Digest must return a unique id per data value.
-	Digest() (id string, data []byte, err error)
+	Digest() (hash string, data []byte, err error)
 }
 
 type ZScorer interface {

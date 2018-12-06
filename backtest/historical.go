@@ -8,7 +8,7 @@ import (
 )
 
 type Historical struct {
-	CommonConfig
+	Common
 	Data ts.OHLCVs
 }
 
@@ -36,7 +36,7 @@ func LoadHistorical(x, bcur, qcur string, tf Timeframe, from, to time.Time) (*Hi
 	}
 
 	h := Historical{
-		CommonConfig: CommonConfig{
+		Common: Common{
 			To:        data.XNT(),
 			From:      data.X0T(),
 			Timeframe: tf,

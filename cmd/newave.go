@@ -18,7 +18,7 @@ import (
 )
 
 type NewaveConfig struct {
-	backtest.CommonConfig
+	backtest.Common
 
 	TimeframeSlow      backtest.Timeframe
 	MACDFast, MACDSlow strategy.MACDOpts
@@ -76,7 +76,7 @@ func NewaveTop(n int) {
 func NewaveOne(bcur, qcur string) {
 	macd1 := strategy.MACDOpts{12, 16, 9}
 	macd2 := macd1
-	res, err := Newave(x, bcur, qcur, ttf, ttf2, macd1, macd2, tfrom, tto)
+	res, err := Newave(x, bcur, qcur, ttf, ttf2, macd1, macd2, tp, sl, tfrom, tto)
 	if err != nil {
 		log.Printf("Newave %s:%s%s - %s", x, bcur, qcur, err)
 		return
@@ -87,7 +87,7 @@ func NewaveOne(bcur, qcur string) {
 	fmt.Println(res)
 
 	// save to redis
-	err = db.SaveZScorer(res, "results")
+	err = db.SaveZScorer(res, zkey)
 	if err != nil {
 		log.Println("db: error saving backtest result:", err)
 	}
@@ -96,12 +96,17 @@ func NewaveOne(bcur, qcur string) {
 func Newave(x, bcur, qcur string,
 	tf, tf2 backtest.Timeframe,
 	macdFast, macdSlow strategy.MACDOpts,
+	tp, sl float64,
 	from, to time.Time) (
 	*NewaveResult, error) {
 	return NewaveConfig{
-		CommonConfig: backtest.CommonConfig{
+		Common: backtest.Common{
 			Exchange: x,
 			Base:     bcur, Quote: qcur, Timeframe: tf, From: from, To: to,
+			RiskProfile: backtest.RiskProfile{
+				TakeProfit: tp,
+				StopLoss:   sl,
+			},
 		},
 		TimeframeSlow: tf2,
 		MACDFast:      macdFast,
@@ -156,12 +161,12 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 		if pos != nil && pos.Active() {
 			potentialNet := pos.NetOnClose(x.Close)
 
-			// target +20%
-			if potentialNet > 0 && potentialNet > 0.1*pos.Cost() {
+			// take profit reached
+			if potentialNet > 0 && potentialNet > n.TakeProfit*pos.Cost() {
 				pos.PaperCloseAt(x.Close, x.Timestamp.T())
 			}
-			// stop   -5%
-			if potentialNet < 0 && potentialNet < -0.025*pos.Cost() {
+			// stop loss reached
+			if potentialNet < 0 && potentialNet < -n.StopLoss*pos.Cost() {
 				pos.PaperCloseAt(x.Close, x.Timestamp.T())
 			}
 

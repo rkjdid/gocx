@@ -14,13 +14,13 @@ import (
 
 var (
 	debug      bool
-	useNopDb   bool
 	db         *_db.RedisDriver
 	redisAddr  string
 	promBind   string
 	promHandle string
 	promServer bool
 	n          int
+	zkey       string
 
 	rootCmd = &cobra.Command{
 		Use:   "gocx",
@@ -67,6 +67,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&promBind, "prometheus-bind", ":8080", "prometheus bind")
 	rootCmd.PersistentFlags().StringVar(&promHandle, "prometheus-handle", "/prometheus", "prometheus handle")
 	rootCmd.PersistentFlags().BoolVar(&promServer, "prometheus-server", false, "enable prometheus webserver")
+	rootCmd.PersistentFlags().StringVar(&zkey, "zkey", "results", "redis key for sorted set")
 
 	rootCmd.AddCommand(backtestCmd, topCmd)
 }

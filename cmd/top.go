@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	_db "github.com/rkjdid/gocx/db"
+	"github.com/rkjdid/gocx/backtest"
 	"github.com/rkjdid/gocx/scraper/binance"
 	"github.com/spf13/cobra"
 	"log"
@@ -21,13 +21,7 @@ var (
 		Short: "Display best scoring backtest executions",
 		Long:  `ZREVRANGE on the sorted set holding strat backtest and display corresponding results`,
 		Run: func(cmd *cobra.Command, args []string) {
-			driver, ok := db.(*_db.RedisDriver)
-			if !ok {
-				log.Fatalln("strat command only available with _db.RedisDriver")
-				return
-			}
-			conn := driver.Conn
-			resp := conn.Cmd("ZREVRANGE", "results", 0, n-1)
+			resp := db.Conn.Cmd("ZREVRANGE", zkey, 0, n-1)
 			if resp.Err != nil {
 				log.Println("redis:", resp.Err)
 				return
@@ -53,14 +47,15 @@ var (
 						continue
 					}
 					result = nwr
-				} else if strings.Index(id, "newave2:") != -1 {
-					var nw2r Newave2Result
-					err = db.LoadJSON(id, &nw2r)
+				} else {
+					// generic backtest.Result
+					var r backtest.Result
+					err = db.LoadJSON(id, &r)
 					if err != nil {
 						log.Println("LoadJSON:", err)
 						continue
 					}
-					result = nw2r
+					result = r
 				}
 				fmt.Printf("%3d/  %s\n", i+1, result)
 			}
