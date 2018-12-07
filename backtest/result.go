@@ -2,7 +2,6 @@ package backtest
 
 import (
 	"fmt"
-	"github.com/rkjdid/gocx/risk"
 	"github.com/rkjdid/gocx/trading"
 	"time"
 )

@@ -63,6 +63,14 @@ func (d *RedisDriver) ZADD(key string, id string, score float64) error {
 	return d.Conn.Cmd("ZADD", key, score, id).Err
 }
 
+func (d *RedisDriver) ZRANK(hash string, id string) (int, error) {
+	res := d.Conn.Cmd("ZRANK", hash, id)
+	if res.Err != nil {
+		return 0, res.Err
+	}
+	return res.Int()
+}
+
 func (d *RedisDriver) EXPIRE(key string, ttl time.Duration) error {
 	return d.Conn.Cmd("EXPIRE", key, int(ttl.Seconds())).Err
 }

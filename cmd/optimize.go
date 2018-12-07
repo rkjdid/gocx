@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
@@ -28,6 +29,9 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 				if err != nil {
 					return fmt.Errorf("couldn't load %s: %s", hash, err)
 				}
+				rank0, _ := db.ZRANK(zkey, hash)
+				log.Printf("initial state: %s", nwr.String())
+				log.Printf("rank %d", rank0)
 
 				sa := SimulatedAnnealing{
 					Steps: 10000,
@@ -35,16 +39,22 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 					TMin:  2.5,
 				}
 				cfg := nwr.Config
-				best, err := sa.Optimize(&cfg)
-				if best != nil {
-					res, _ := best.(*NewaveConfig).Backtest()
-					log.Printf("best: %s", best.(*NewaveConfig))
-					id, err := db.SaveZScorer(res, "annealing")
+				res, err := sa.Optimize(&NewaveResult{Config: cfg})
+				if res != nil {
+					best := res.(*NewaveResult)
+					hash, data, err := best.Digest()
 					if err != nil {
-						log.Println("error saving best result:", err)
-					} else {
-						log.Printf("saved: %s: %f", id, res.ZScore())
+						return fmt.Errorf("couldn't digest result: %s", err)
 					}
+					_, err = db.SaveZScorer(best, zkey)
+					if err != nil {
+						log.Println("redis set:", err)
+					}
+					log.Printf("best: %s", best)
+					rank, _ := db.ZRANK(zkey, hash)
+					log.Printf("rank %d", rank)
+					rawJson, _ := json.MarshalIndent(data, "    ", "  ")
+					log.Printf("\n%s", rawJson)
 				}
 				if err != nil {
 					return fmt.Errorf("stopped: %s", err)
@@ -124,7 +134,7 @@ type AnnealingState interface {
 }
 
 // Newave implementation
-func (cfg *NewaveConfig) Move() AnnealingState {
+func (nwr *NewaveResult) Move() AnnealingState {
 	//var sign = func() int {
 	//	if rand.Int() % 2 == 0 {
 	//		return -1
@@ -134,20 +144,21 @@ func (cfg *NewaveConfig) Move() AnnealingState {
 	//}
 	//var signF = func() float64 {return float64(sign())}
 
-	next := *cfg
-	next.StopLoss += randRangeF(-0.01, 0.01)
-	next.TakeProfit += randRangeF(-0.01, 0.01)
+	next := *nwr
+	next.Config.StopLoss += randRangeF(-0.01, 0.01)
+	next.Config.TakeProfit += randRangeF(-0.01, 0.01)
 	return &next
 }
 
-func (cfg NewaveConfig) Energy() float64 {
-	res, err := cfg.Backtest()
+func (nwr *NewaveResult) Energy() float64 {
+	res, err := nwr.Config.Backtest()
 	if err != nil {
-		log.Println("cfg.Backtest():", err)
+		log.Println("nwr.Backtest():", err)
 		return 0
 	}
+	*nwr = *res
 	// in annealing sim, the lesser the energy the better
-	return -res.ZScore()
+	return -nwr.ZScore()
 }
 
 // rand helpers

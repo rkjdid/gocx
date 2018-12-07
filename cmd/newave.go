@@ -23,13 +23,6 @@ type NewaveConfig struct {
 
 	TimeframeSlow      backtest.Timeframe
 	MACDFast, MACDSlow strategy.MACDOpts
-
-	//tuneState struct {
-	//	sign      bool
-	//	fibIndex  int
-	//	macdIndex int
-	//	macdSeed  strategy.MACDOpts
-	//}
 }
 
 type NewaveResult struct {
@@ -244,23 +237,24 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 }
 
 // Digest is db.Digester implementation with json data and a id-hash.
-func (r NewaveResult) Digest() (id string, data []byte, err error) {
+func (nwr NewaveResult) Digest() (id string, data []byte, err error) {
 	return _db.JSONDigest(
-		fmt.Sprintf("%s:%s%s", NewavePrefix, r.Config.Base, r.Config.Quote),
-		r,
+		fmt.Sprintf("%s:%s%s", NewavePrefix, nwr.Config.Base, nwr.Config.Quote),
+		nwr,
 	)
 }
 
 func (n NewaveConfig) String() string {
-	return fmt.Sprintf("%8s - tf: %s - %s to %s - macd(%s, %s) & macd(%s, %s)",
+	return fmt.Sprintf("%8s - tf: %s - %s to %s - macd(%s, %s) & macd(%s, %s) - tp: %.3f%% sl: %.3f%%",
 		fmt.Sprint(n.Base, n.Quote), n.Timeframe,
 		n.From.Format("02/01/06"), n.To.Format("02/01/2006"),
 		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
+		n.TakeProfit*100, -n.StopLoss*100,
 	)
 }
 
-func (r NewaveResult) String() string {
-	return fmt.Sprintf("%s - %s", r.Config, r.Result)
+func (nwr NewaveResult) String() string {
+	return fmt.Sprintf("%s -> %s", nwr.Config, nwr.Result)
 }
 
 //func (n *NewaveConfig) Optimize(maxIterations int) (*NewaveResult, error) {
