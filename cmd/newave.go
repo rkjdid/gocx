@@ -5,9 +5,9 @@ import (
 	"github.com/rkjdid/gocx/backtest"
 	"github.com/rkjdid/gocx/chart"
 	_db "github.com/rkjdid/gocx/db"
-	"github.com/rkjdid/gocx/risk"
 	"github.com/rkjdid/gocx/scraper/binance"
-	"github.com/rkjdid/gocx/strategy"
+	"github.com/rkjdid/gocx/trading"
+	"github.com/rkjdid/gocx/trading/strategy"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/plot/vg"
 	"log"
@@ -19,7 +19,7 @@ const NewavePrefix = "newave"
 
 type NewaveConfig struct {
 	backtest.Source
-	risk.Profile
+	trading.Profile
 
 	TimeframeSlow      backtest.Timeframe
 	MACDFast, MACDSlow strategy.MACDOpts
@@ -111,7 +111,7 @@ func Newave(x, bcur, qcur string,
 			Exchange: x,
 			Base:     bcur, Quote: qcur, Timeframe: tf, From: from, To: to,
 		},
-		Profile: risk.Profile{
+		Profile: trading.Profile{
 			TakeProfit: tp,
 			StopLoss:   sl,
 		},
@@ -159,7 +159,7 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 	var k0 = 1.0
 	var k = k0
 	var result = NewaveResult{Config: n}
-	var pos *risk.Position
+	var pos *trading.Position
 
 	j := 0
 	var sig1, sig2, last strategy.Signal
@@ -178,7 +178,7 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 				pos.PaperCloseAt(x.Close, x.Timestamp.T())
 			}
 
-			if pos.State == risk.Closed {
+			if pos.State == trading.Closed {
 				trades.WithLabelValues("sell", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				k += pos.Net()
 			}
@@ -214,8 +214,8 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 			last = trigger
 
 			// buy signal -> open position
-			if tt && (pos == nil || pos.State == risk.Closed) {
-				pos = risk.NewPosition(x.Timestamp.T(), n.Base, n.Quote, risk.Long)
+			if tt && (pos == nil || pos.State == trading.Closed) {
+				pos = trading.NewPosition(x.Timestamp.T(), n.Base, n.Quote, trading.Long)
 				pos.PaperBuyAt(k/x.Close, x.Close, x.Timestamp.T())
 				trades.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				result.Positions = append(result.Positions, pos)

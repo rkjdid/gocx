@@ -1,4 +1,4 @@
-package risk
+package trading
 
 const (
 	BTC = "BTC"

@@ -1,4 +1,4 @@
-package risk
+package trading
 
 type Profile struct {
 	TakeProfit float64

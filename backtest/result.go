@@ -3,11 +3,12 @@ package backtest
 import (
 	"fmt"
 	"github.com/rkjdid/gocx/risk"
+	"github.com/rkjdid/gocx/trading"
 	"time"
 )
 
 type Result struct {
-	Positions []*risk.Position
+	Positions []*trading.Position
 	From, To  time.Time
 	Score     float64
 	Z         float64
