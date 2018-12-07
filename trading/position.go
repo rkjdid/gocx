@@ -92,6 +92,19 @@ func (p Position) Net() float64 {
 	}
 }
 
+//todo think & test these things, diff between Net & NetRatio, etc.
+func (p Position) NetRatio() float64 {
+	if p.AvgEntry == 0 || p.AvgExit == 0 {
+		return 0
+	}
+	netRatio := p.AvgExit / p.AvgEntry
+	if p.Direction == Long {
+		return netRatio
+	} else {
+		return -netRatio
+	}
+}
+
 // NetOnClose will PaperClose and return Net on a copy of p, caller Position is unchanged.
 func (p Position) NetOnClose(pr float64) float64 {
 	p.PaperClose(pr)
