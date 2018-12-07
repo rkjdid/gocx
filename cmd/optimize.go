@@ -46,7 +46,7 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 					if err != nil {
 						return fmt.Errorf("couldn't digest result: %s", err)
 					}
-					_, err = db.SaveZScorer(best, zkey)
+					_, err = db.SaveZScorer(best, "optimized")
 					if err != nil {
 						log.Println("redis set:", err)
 					}
