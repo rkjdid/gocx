@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rkjdid/gocx/backtest"
 	"github.com/rkjdid/gocx/scraper"
 	"github.com/spf13/cobra"
@@ -19,15 +18,6 @@ var (
 	tp, sl     float64
 
 	tformat = "02-01-2006"
-
-	// prometheus metrics
-	signals = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "signal", Help: "signals",
-	}, []string{"name", "action"})
-
-	trades = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "trade", Help: "trades",
-	}, []string{"direction", "quantity", "price"})
 )
 
 var backtestCmd = TraverseRunHooks(&cobra.Command{
@@ -36,20 +26,6 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 	Long:  `Needs a strategy, a config, an asset, a timeframe.. stuff like that`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
-		if from != "" {
-			tfrom, err = time.Parse(tformat, from)
-			if err != nil {
-				return fmt.Errorf("parsing -from: %s\n", err)
-			}
-		}
-		if to == "" {
-			tto = time.Now()
-		} else {
-			tto, err = time.Parse(tformat, to)
-			if err != nil {
-				return fmt.Errorf("parsing -to: %s\n", err)
-			}
-		}
 		ttf, err = backtest.ParseTf(tf)
 		if err != nil {
 			return fmt.Errorf("parsing -tf: %s\n", err)
@@ -63,6 +39,20 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 			ttf2, err = backtest.ParseTf(tf2)
 			if err != nil {
 				return fmt.Errorf("parsing -tf2: %s\n", err)
+			}
+		}
+		if from != "" {
+			tfrom, err = time.Parse(tformat, from)
+			if err != nil {
+				return fmt.Errorf("parsing -from: %s\n", err)
+			}
+		}
+		if to == "" {
+			tto = time.Now().Truncate(ttf.ToDuration())
+		} else {
+			tto, err = time.Parse(tformat, to)
+			if err != nil {
+				return fmt.Errorf("parsing -to: %s\n", err)
 			}
 		}
 

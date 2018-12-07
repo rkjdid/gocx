@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"github.com/rkjdid/gocx/backtest"
 	"github.com/rkjdid/gocx/chart"
+	_db "github.com/rkjdid/gocx/db"
 	"github.com/rkjdid/gocx/risk"
 	"github.com/rkjdid/gocx/scraper/binance"
 	"github.com/rkjdid/gocx/strategy"
@@ -17,11 +15,21 @@ import (
 	"time"
 )
 
+const NewavePrefix = "newave"
+
 type NewaveConfig struct {
-	backtest.Common
+	backtest.Source
+	risk.Profile
 
 	TimeframeSlow      backtest.Timeframe
 	MACDFast, MACDSlow strategy.MACDOpts
+
+	//tuneState struct {
+	//	sign      bool
+	//	fibIndex  int
+	//	macdIndex int
+	//	macdSeed  strategy.MACDOpts
+	//}
 }
 
 type NewaveResult struct {
@@ -73,13 +81,12 @@ func NewaveTop(n int) {
 	}
 }
 
-func NewaveOne(bcur, qcur string) {
-	macd1 := strategy.MACDOpts{12, 16, 9}
-	macd2 := macd1
-	res, err := Newave(x, bcur, qcur, ttf, ttf2, macd1, macd2, tp, sl, tfrom, tto)
+func NewaveOne(bcur, qcur string) (*NewaveResult, error) {
+	macd := strategy.MACDOpts{12, 16, 9}
+	res, err := Newave(x, bcur, qcur, ttf, ttf2, macd, macd, tp, sl, tfrom, tto).Backtest()
 	if err != nil {
 		log.Printf("Newave %s:%s%s - %s", x, bcur, qcur, err)
-		return
+		return nil, err
 	}
 	for _, p := range res.Positions {
 		fmt.Println(p)
@@ -87,31 +94,31 @@ func NewaveOne(bcur, qcur string) {
 	fmt.Println(res)
 
 	// save to redis
-	err = db.SaveZScorer(res, zkey)
+	_, err = db.SaveZScorer(res, zkey)
 	if err != nil {
 		log.Println("db: error saving backtest result:", err)
 	}
+	return res, err
 }
 
 func Newave(x, bcur, qcur string,
 	tf, tf2 backtest.Timeframe,
 	macdFast, macdSlow strategy.MACDOpts,
 	tp, sl float64,
-	from, to time.Time) (
-	*NewaveResult, error) {
-	return NewaveConfig{
-		Common: backtest.Common{
+	from, to time.Time) *NewaveConfig {
+	return &NewaveConfig{
+		Source: backtest.Source{
 			Exchange: x,
 			Base:     bcur, Quote: qcur, Timeframe: tf, From: from, To: to,
-			RiskProfile: backtest.RiskProfile{
-				TakeProfit: tp,
-				StopLoss:   sl,
-			},
+		},
+		Profile: risk.Profile{
+			TakeProfit: tp,
+			StopLoss:   sl,
 		},
 		TimeframeSlow: tf2,
 		MACDFast:      macdFast,
 		MACDSlow:      macdSlow,
-	}.Backtest()
+	}
 }
 
 func (n NewaveConfig) Backtest() (*NewaveResult, error) {
@@ -122,17 +129,18 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 		return nil, fmt.Errorf("invalid tf2: %s", n.TimeframeSlow)
 	}
 
-	histFast, err := backtest.LoadHistorical(n.Exchange, n.Base, n.Quote, n.Timeframe, n.From, n.To)
+	histFast, err := backtest.LoadHistorical(db, n.Exchange, n.Base, n.Quote, n.Timeframe, n.From, n.To)
 	if err != nil {
 		return nil, err
 	}
-	histSlow, err := backtest.LoadHistorical(n.Exchange, n.Base, n.Quote, n.TimeframeSlow, n.From, n.To)
+	histSlow, err := backtest.LoadHistorical(db, n.Exchange, n.Base, n.Quote, n.TimeframeSlow, n.From, n.To)
 	if err != nil {
 		return nil, err
 	}
 
 	// set actual n.From after LoadHistorical
 	n.From = histFast.From
+	n.To = histFast.To
 
 	// init chart
 	if chartFlag {
@@ -237,19 +245,14 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 
 // Digest is db.Digester implementation with json data and a id-hash.
 func (r NewaveResult) Digest() (id string, data []byte, err error) {
-	var b bytes.Buffer
-	err = json.NewEncoder(&b).Encode(r)
-	if err != nil {
-		return
-	}
-	data = b.Bytes()
-	shasum := sha256.Sum256(data)
-	id = fmt.Sprintf("newave:%s%s:%x", r.Config.Base, r.Config.Quote, shasum[:10])
-	return
+	return _db.JSONDigest(
+		fmt.Sprintf("%s:%s%s", NewavePrefix, r.Config.Base, r.Config.Quote),
+		r,
+	)
 }
 
 func (n NewaveConfig) String() string {
-	return fmt.Sprintf("newave  %8s - tf: %s - %s to %s - macd(%s, %s) & macd(%s, %s)",
+	return fmt.Sprintf("%8s - tf: %s - %s to %s - macd(%s, %s) & macd(%s, %s)",
 		fmt.Sprint(n.Base, n.Quote), n.Timeframe,
 		n.From.Format("02/01/06"), n.To.Format("02/01/2006"),
 		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
@@ -259,3 +262,125 @@ func (n NewaveConfig) String() string {
 func (r NewaveResult) String() string {
 	return fmt.Sprintf("%s - %s", r.Config, r.Result)
 }
+
+//func (n *NewaveConfig) Optimize(maxIterations int) (*NewaveResult, error) {
+//	r0, err := n.Backtest()
+//	if err != nil {
+//		return r0, err
+//	}
+//
+//	var top _db.TopZScorer
+//	var best *NewaveResult
+//	var bestHash string
+//	var stale int
+//	for seq := 0; ; seq++ {
+//		if seq > maxIterations {
+//			return best, nil
+//		}
+//
+//		r1, err := r0.Config.Tune(seq).Backtest()
+//		if err != nil {
+//			return best, err
+//		}
+//		r2, err := r0.Config.Tune(seq).Backtest()
+//		if err != nil {
+//			return best, err
+//		}
+//
+//		top = _db.TopZScorer{r0, r1, r2}
+//		sort.Sort(top)
+//		if best == nil || top[0].ZScore() > best.ZScore() {
+//			best = top[0].(*NewaveResult)
+//			bestHash, _, err = best.Digest()
+//			if err != nil {
+//				log.Printf("best.Digest: %s", err)
+//			} else {
+//				log.Printf("new best: %s - %s", best, bestHash)
+//			}
+//			stale = 0
+//			r0 = best
+//		} else {
+//			if stale % 3 == 1 {
+//				r0 = r1
+//			} else if stale % 3 == 2 {
+//				r0 = r2
+//			}
+//			stale++
+//			log.Printf("stale %d", stale)
+//		}
+//	}
+//}
+
+//var (
+//	// fib levels
+//	fibQuotients = []float64{
+//		1: .236,
+//		2: .382,
+//		3: .5,
+//		4: .618,
+//	}
+//
+//	ftoi = func(f float64) int {
+//		return int(f)
+//	}
+//
+//	macdConfigs = []strategy.MACDOpts{
+//		0: {12, 26, 9},
+//		1: {12 - ftoi(12*.236), 26 - ftoi(26*.236), 9 - ftoi(9*.236)},
+//		2: {12 + ftoi(12*.236), 26 + ftoi(26*.236), 9 + ftoi(9*.236)},
+//		3: {12 - ftoi(12*.382), 26 - ftoi(26*.382), 9 - ftoi(9*.382)},
+//		4: {12 + ftoi(12*.382), 26 + ftoi(26*.382), 9 + ftoi(9*.382)},
+//		5: {12 - ftoi(12*.618), 26 - ftoi(26*.618), 9 - ftoi(9*.618)},
+//		6: {12 + ftoi(12*.618), 26 + ftoi(26*.618), 9 + ftoi(9*.618)},
+//	}
+//)
+//
+//func (n *NewaveConfig) Tune(seq int) *NewaveConfig {
+//	// update tune state, which indicates how the next
+//	// config will be generated.
+//
+//	// swap sign
+//	sign := !n.tuneState.sign
+//	n.tuneState.sign = sign
+//
+//	// inc fib level
+//	fib := (n.tuneState.fibIndex + 1) % len(fibQuotients)
+//	n.tuneState.fibIndex = fib
+//
+//	// inc macd config index
+//	macd := (n.tuneState.macdIndex + 1) % len(macdConfigs)
+//	n.tuneState.macdIndex = macd
+//
+//	// prepare fib quotient
+//	fibQ := fibQuotients[fib]
+//	if sign {
+//		fibQ = -fibQ
+//	}
+//
+//	// copy current config
+//	cfg := *n
+//
+//	// sequentially change parameters: StopLoss, TakeProfit
+//	switch seq % 2 {
+//	case 0:
+//		delta := fibQ * cfg.StopLoss
+//		old := cfg.StopLoss
+//		cfg.StopLoss += delta
+//		log.Printf("tuning stop-loss with d(%.3f%%): %.3f -> %.3f", delta, old, cfg.StopLoss)
+//	//case 4:
+//	//	old := cfg.MACDFast
+//	//	cfg.MACDFast = macdConfigs[macd]
+//	//	log.Printf("changing macdFast(%s) from %s to %s", cfg.Timeframe, old, cfg.MACDFast)
+//	case 1:
+//		delta := fibQ * cfg.TakeProfit
+//		old := cfg.TakeProfit
+//		cfg.TakeProfit += delta
+//		log.Printf("tuning take-profit with d(%.3f%%): %.3f -> %.3f", delta, old, cfg.TakeProfit)
+//	//case 8:
+//		// swap macd parameters while breaking sign sequence
+//		//cfg.MACDSlow, cfg.MACDFast = cfg.MACDFast, cfg.MACDSlow
+//		//log.Printf("swapped macds values: (%s, %s) - (%s, %s)", cfg.Timeframe, cfg.MACDFast,
+//		//	cfg.TimeframeSlow, cfg.MACDSlow)
+//	}
+//	return &cfg
+//}

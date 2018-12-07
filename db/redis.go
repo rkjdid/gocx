@@ -3,14 +3,19 @@ package db
 import (
 	"encoding/json"
 	"github.com/mediocregopher/radix.v2/redis"
+	"github.com/rkjdid/errors"
+	"time"
 )
 
 type RedisDriver struct {
 	Conn *redis.Client
 }
 
-func (d *RedisDriver) LoadJSON(id string, v interface{}) error {
-	resp := d.Conn.Cmd("GET", id)
+var (
+	KeyError = errors.Newf("key not found: %s")
+)
+
+func loadJSONResp(resp *redis.Resp, v interface{}) error {
 	if resp.Err != nil {
 		return resp.Err
 	}
@@ -21,22 +26,43 @@ func (d *RedisDriver) LoadJSON(id string, v interface{}) error {
 	return json.Unmarshal(b, v)
 }
 
+func (d *RedisDriver) LoadJSON(id string, v interface{}) error {
+	resp := d.Conn.Cmd("GET", id)
+	return loadJSONResp(resp, v)
+}
+
 func (d *RedisDriver) Save(v Digester) (id string, err error) {
 	id, data, err := v.Digest()
 	if err != nil {
 		return id, err
 	}
-	return id, d.Conn.Cmd("SET", id, data).Err
+	return id, d.SET(id, data)
 }
 
-func (d *RedisDriver) SaveZScorer(item ZScorer, zkey string) error {
+func (d *RedisDriver) SaveTTL(v Digester, ttl time.Duration) (id string, err error) {
+	id, err = d.Save(v)
+	if err == nil {
+		err = d.EXPIRE(id, ttl)
+	}
+	return id, err
+}
+
+func (d *RedisDriver) SaveZScorer(item ZScorer, zkey string) (string, error) {
 	id, err := d.Save(item)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return d.ZADD(zkey, id, item.ZScore())
+	return id, d.ZADD(zkey, id, item.ZScore())
+}
+
+func (d *RedisDriver) SET(id string, v interface{}) error {
+	return d.Conn.Cmd("SET", id, v).Err
 }
 
 func (d *RedisDriver) ZADD(key string, id string, score float64) error {
 	return d.Conn.Cmd("ZADD", key, score, id).Err
+}
+
+func (d *RedisDriver) EXPIRE(key string, ttl time.Duration) error {
+	return d.Conn.Cmd("EXPIRE", key, int(ttl.Seconds())).Err
 }

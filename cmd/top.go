@@ -39,7 +39,7 @@ var (
 				}
 
 				var result interface{}
-				if strings.Index(id, "newave:") != -1 {
+				if strings.Index(id, NewavePrefix) == 0 {
 					var nwr NewaveResult
 					err = db.LoadJSON(id, &nwr)
 					if err != nil {
@@ -57,7 +57,7 @@ var (
 					}
 					result = r
 				}
-				fmt.Printf("%3d/  %s\n", i+1, result)
+				fmt.Printf("%3d/ %s %s\n", i+1, id, result)
 			}
 		},
 	})

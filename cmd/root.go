@@ -53,6 +53,15 @@ var (
 			}
 		},
 	}
+
+	// prometheus metrics
+	signals = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "signal", Help: "signals",
+	}, []string{"name", "action"})
+
+	trades = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "trade", Help: "trades",
+	}, []string{"direction", "quantity", "price"})
 )
 
 func Execute() {
