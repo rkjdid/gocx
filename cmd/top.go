@@ -10,6 +10,8 @@ import (
 )
 
 var (
+	script bool
+
 	topCmd = TraverseRunHooks(&cobra.Command{
 		Use:   "top",
 		Short: "Display top items",
@@ -35,6 +37,10 @@ var (
 				id, err := v.Str()
 				if err != nil {
 					log.Println("v.Str():", err)
+					continue
+				}
+				if script {
+					fmt.Println(id)
 					continue
 				}
 
@@ -83,6 +89,7 @@ var (
 
 func init() {
 	topCmd.PersistentFlags().IntVarP(&n, "n", "n", 10, "top n markets/executions")
+	topCmd.PersistentFlags().BoolVarP(&script, "script", "s", false, "print in a script friendly manner, if possible")
 	marketsCmd.LocalFlags().StringVar(&x, "x", "binance", "exchange to fetch markets from")
 
 	topCmd.AddCommand(strategiesCmd, marketsCmd)
