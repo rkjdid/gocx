@@ -79,6 +79,15 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&zkey, "zkey", "backtest", "redis key for sorted set")
 
 	rootCmd.AddCommand(backtestCmd, topCmd, showCmd, optimizeCmd)
+	rootCmd.AddCommand(&cobra.Command{
+		Use: "flushdb",
+		Run: func(cmd *cobra.Command, args []string) {
+			err := db.Conn.Cmd("flushdb").Err
+			if err != nil {
+				log.Fatalln("flushdb", err)
+			}
+		},
+	})
 }
 
 // TraverseRunHooks modifies c's PersistentPreRun* and PersistentPostRun*
