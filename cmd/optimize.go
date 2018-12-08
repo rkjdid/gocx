@@ -21,13 +21,13 @@ var (
 Loads hash result from a previous backtest, and optimize from
 there. It can run for a while depending on optimizer config and strat.Backtest..`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Run: func(cmd *cobra.Command, args []string) {
 			hash := args[0]
 			if strings.Index(hash, NewavePrefix) == 0 {
 				var nwr NewaveResult
 				err := db.LoadJSON(hash, &nwr)
 				if err != nil {
-					return fmt.Errorf("couldn't load %s: %s", hash, err)
+					log.Fatalf("couldn't load %s: %s", hash, err)
 				}
 				rank0, _ := db.ZRANK(zkey, hash)
 				log.Printf("initial state: %s", nwr.String())
@@ -44,7 +44,7 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 					best := res.(*NewaveResult)
 					hash, _, err := best.Digest()
 					if err != nil {
-						return fmt.Errorf("couldn't digest result: %s", err)
+						log.Fatalf("couldn't digest result: %s", err)
 					}
 					_, err = db.SaveZScorer(best, "optimized")
 					if err != nil {
@@ -55,13 +55,14 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 					log.Printf("rank %d", rank)
 					rawJson, _ := json.MarshalIndent(best, "    ", "  ")
 					log.Printf("\n%s", rawJson)
+					fmt.Println(best.Details())
 				}
 				if err != nil {
-					return fmt.Errorf("stopped: %s", err)
+					log.Fatalf("stopped: %s", err)
 				}
-				return nil
+				return
 			}
-			return fmt.Errorf("unsupported hash prefix: %s", hash)
+			log.Fatalf("unsupported hash prefix: %s", hash)
 		},
 	}
 

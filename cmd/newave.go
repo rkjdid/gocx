@@ -263,6 +263,14 @@ func (nwr NewaveResult) String() string {
 	return fmt.Sprintf("%s -> %s", nwr.Config, nwr.Result)
 }
 
+func (nwr NewaveResult) Details() string {
+	s := ""
+	for _, p := range nwr.Positions {
+		s += fmt.Sprintln(p)
+	}
+	return s + fmt.Sprintln(nwr)
+}
+
 //func (n *NewaveConfig) Optimize(maxIterations int) (*NewaveResult, error) {
 //	r0, err := n.Backtest()
 //	if err != nil {

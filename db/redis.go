@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/mediocregopher/radix.v2/redis"
 	"github.com/rkjdid/errors"
 	"time"
@@ -69,6 +70,14 @@ func (d *RedisDriver) ZRANK(hash string, id string) (int, error) {
 		return 0, res.Err
 	}
 	return res.Int()
+}
+
+func (d *RedisDriver) ZRANGE(key string, i, j int) ([]string, error) {
+	resp := d.Conn.Cmd("ZRANGE", key, 0, -1)
+	if resp.Err != nil {
+		return nil, fmt.Errorf("zrange: %s", resp.Err)
+	}
+	return resp.List()
 }
 
 func (d *RedisDriver) EXPIRE(key string, ttl time.Duration) error {

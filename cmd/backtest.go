@@ -5,6 +5,7 @@ import (
 	"github.com/rkjdid/gocx/backtest"
 	"github.com/rkjdid/gocx/scraper"
 	"github.com/spf13/cobra"
+	"log"
 	"strings"
 	"time"
 )
@@ -58,27 +59,42 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 		}
 		return nil
 	},
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Args: cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
 		// re-run backtest from redis key
 		id := args[0]
-		if strings.Index(id, NewavePrefix+":") == 0 {
-			var nwr NewaveResult
-			err := db.LoadJSON(id, &nwr)
+		if id == "all" {
+			keys, err := db.ZRANGE(zkey, 0, -1)
 			if err != nil {
-				return fmt.Errorf("load json: %s", err)
+				log.Fatalln("db.ZRANGE:", err)
 			}
-			res, err := nwr.Config.Backtest()
+			for _, key := range keys {
+				res, err := rerunNewave(key)
+				if err != nil {
+					log.Println(key, err)
+					continue
+				}
+				fmt.Println(res.Details())
+				// update db
+				_, err = db.SaveZScorer(res, zkey)
+				if err != nil {
+					log.Printf("save: %s", err)
+				}
+			}
+		} else if strings.Index(id, NewavePrefix+":") == 0 {
+			res, err := rerunNewave(id)
 			if err != nil {
-				return fmt.Errorf("backtest: %s", err)
+				log.Fatalln(err)
 			}
-			for _, p := range res.Positions {
-				fmt.Println(p)
+			fmt.Println(res.Details())
+			// update db
+			_, err = db.SaveZScorer(res, zkey)
+			if err != nil {
+				log.Printf("save: %s", err)
 			}
-			fmt.Println(res)
-			return nil
+		} else {
+			log.Fatalf("unsupported hash prefix: %s", id)
 		}
-		return fmt.Errorf("unsupported hash prefix: %s", id)
 	},
 })
 
@@ -93,6 +109,15 @@ func init() {
 	backtestCmd.PersistentFlags().Float64Var(&sl, "sl", 0.025, "stop loss")
 
 	backtestCmd.AddCommand(newaveCmd)
+}
+
+func rerunNewave(key string) (*NewaveResult, error) {
+	var nwr NewaveResult
+	err := db.LoadJSON(key, &nwr)
+	if err != nil {
+		return nil, fmt.Errorf("LoadJSON: %s", err)
+	}
+	return nwr.Config.Backtest()
 }
 
 func tfFlagHelper() string {
