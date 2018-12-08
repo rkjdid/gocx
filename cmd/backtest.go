@@ -5,6 +5,7 @@ import (
 	"github.com/rkjdid/gocx/backtest"
 	"github.com/rkjdid/gocx/scraper"
 	"github.com/spf13/cobra"
+	"strings"
 	"time"
 )
 
@@ -55,8 +56,29 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 				return fmt.Errorf("parsing -to: %s\n", err)
 			}
 		}
-
 		return nil
+	},
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// re-run backtest from redis key
+		id := args[0]
+		if strings.Index(id, NewavePrefix+":") == 0 {
+			var nwr NewaveResult
+			err := db.LoadJSON(id, &nwr)
+			if err != nil {
+				return fmt.Errorf("load json: %s", err)
+			}
+			res, err := nwr.Config.Backtest()
+			if err != nil {
+				return fmt.Errorf("backtest: %s", err)
+			}
+			for _, p := range res.Positions {
+				fmt.Println(p)
+			}
+			fmt.Println(res)
+			return nil
+		}
+		return fmt.Errorf("unsupported hash prefix: %s", id)
 	},
 })
 

@@ -28,15 +28,8 @@ func (r *Result) UpdateScore() {
 	for _, p := range r.Positions {
 		r.Score += p.Net()
 	}
-	// figure out duration for r
-	for i := len(r.Positions) - 1; i >= 0; i-- {
-		pos := r.Positions[i]
-		if pos.CloseTime.Equal(time.Time{}) {
-			continue
-		}
-		r.Z = r.Score / (pos.CloseTime.Sub(r.Positions[0].OpenTime).Hours() / 24)
-		break
-	}
+	nbDays := r.To.Sub(r.From).Hours() / 24
+	r.Z = r.Score / nbDays
 	return
 }
 
@@ -49,5 +42,5 @@ func (r Result) String() string {
 			wins++
 		}
 	}
-	return fmt.Sprintf("net/day: %5.2f%%, +pos: %2d, -pos: %2d", r.ZScore()*100, wins, loses)
+	return fmt.Sprintf("zscore: %5.3f, +pos: %2d, -pos: %2d", 100*r.ZScore(), wins, loses)
 }

@@ -78,7 +78,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&promServer, "prometheus-server", false, "enable prometheus webserver")
 	rootCmd.PersistentFlags().StringVar(&zkey, "zkey", "backtest", "redis key for sorted set")
 
-	rootCmd.AddCommand(backtestCmd, topCmd)
+	rootCmd.AddCommand(backtestCmd, topCmd, showCmd, optimizeCmd)
 }
 
 // TraverseRunHooks modifies c's PersistentPreRun* and PersistentPostRun*

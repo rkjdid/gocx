@@ -42,7 +42,7 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 				res, err := sa.Optimize(&NewaveResult{Config: cfg})
 				if res != nil {
 					best := res.(*NewaveResult)
-					hash, data, err := best.Digest()
+					hash, _, err := best.Digest()
 					if err != nil {
 						return fmt.Errorf("couldn't digest result: %s", err)
 					}
@@ -53,7 +53,7 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 					log.Printf("best: %s", best)
 					rank, _ := db.ZRANK(zkey, hash)
 					log.Printf("rank %d", rank)
-					rawJson, _ := json.MarshalIndent(data, "    ", "  ")
+					rawJson, _ := json.MarshalIndent(best, "    ", "  ")
 					log.Printf("\n%s", rawJson)
 				}
 				if err != nil {
@@ -80,7 +80,6 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 )
 
 func init() {
-	rootCmd.AddCommand(optimizeCmd)
 	//optimizeCmd.PersistentFlags().IntVarP(
 	//	&optimizeMax, "max", "", 100, "maximum number of optimize iterations")
 	rand.Seed(time.Now().Unix())
@@ -118,7 +117,7 @@ func (sa *SimulatedAnnealing) Optimize(state AnnealingState) (best AnnealingStat
 			}
 			if E < bestE {
 				// new best
-				log.Printf("new best: %.5f%%", -E)
+				log.Printf("new best: %.5f%%", -E*100)
 				saBestImproved.Inc()
 				bestE = E
 				best = state

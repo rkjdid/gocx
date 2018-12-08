@@ -151,7 +151,13 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 
 	var k0 = 1.0
 	var k = k0
-	var result = NewaveResult{Config: n}
+	var result = NewaveResult{
+		Config: n,
+		Result: backtest.Result{
+			From: n.From,
+			To:   n.To,
+		},
+	}
 	var pos *trading.Position
 
 	j := 0
@@ -245,7 +251,7 @@ func (nwr NewaveResult) Digest() (id string, data []byte, err error) {
 }
 
 func (n NewaveConfig) String() string {
-	return fmt.Sprintf("%8s - tf: %s - %s to %s - macd(%s, %s) & macd(%s, %s) - tp: %.3f%% sl: %.3f%%",
+	return fmt.Sprintf("%8s - %s - %s to %s - macd(%s, %s) & macd(%s, %s) - tp %.1f%% sl %.1f%%",
 		fmt.Sprint(n.Base, n.Quote), n.Timeframe,
 		n.From.Format("02/01/06"), n.To.Format("02/01/2006"),
 		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
