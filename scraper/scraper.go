@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -19,6 +20,10 @@ var (
 		TfMinute: time.Minute,
 		TfHour:   time.Hour,
 		TfDay:    time.Hour * 24,
+	}
+
+	curAliases = map[string]string{
+		"BCC": "BCH",
 	}
 )
 
@@ -52,6 +57,13 @@ func (cc CryptoCompareResponse) String() string {
 	return s
 }
 
+func fixCurrency(cur string) string {
+	if v, ok := curAliases[cur]; ok {
+		return v
+	}
+	return cur
+}
+
 func FetchHistorical(exchange string, base, quote string, tf string, aggregate int, from, to time.Time,
 ) (data ts.OHLCVs, err error) {
 	if aggregate < 1 {
@@ -72,6 +84,8 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 	u, _ := url.Parse(CryptoCompareAPI)
 	u.Path += tf
 	q := url.Values{}
+	base = fixCurrency(strings.ToUpper(base))
+	quote = fixCurrency(strings.ToUpper(quote))
 	q.Set("fsym", base)
 	q.Set("tsym", quote)
 	if exchange != "" {
