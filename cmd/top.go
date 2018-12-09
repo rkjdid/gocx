@@ -23,31 +23,20 @@ var (
 		Short: "Display best scoring backtest executions",
 		Long:  `ZREVRANGE on the sorted set holding strat backtest and display corresponding results`,
 		Run: func(cmd *cobra.Command, args []string) {
-			resp := db.Conn.Cmd("ZREVRANGE", zkey, 0, n-1)
-			if resp.Err != nil {
-				log.Println("redis:", resp.Err)
-				return
-			}
-			strats, err := resp.Array()
+			keys, err := db.ZREVRANGE(zkey, 0, n-1)
 			if err != nil {
-				log.Println("redis cast array:", err)
-				return
+				log.Fatalf("db.ZREVRANGE: %s", err)
 			}
-			for i, v := range strats {
-				id, err := v.Str()
-				if err != nil {
-					log.Println("v.Str():", err)
-					continue
-				}
+			for i, key := range keys {
 				if script {
-					fmt.Println(id)
+					fmt.Println(key)
 					continue
 				}
 
 				var result interface{}
-				if strings.Index(id, NewavePrefix) == 0 {
+				if strings.Index(key, NewavePrefix) == 0 {
 					var nwr NewaveResult
-					err = db.LoadJSON(id, &nwr)
+					err = db.LoadJSON(key, &nwr)
 					if err != nil {
 						log.Println("LoadJSON:", err)
 						continue
@@ -56,14 +45,14 @@ var (
 				} else {
 					// generic backtest.Result
 					var r backtest.Result
-					err = db.LoadJSON(id, &r)
+					err = db.LoadJSON(key, &r)
 					if err != nil {
 						log.Println("LoadJSON:", err)
 						continue
 					}
 					result = r
 				}
-				fmt.Printf("%3d/ %s %s\n", i+1, id, result)
+				fmt.Printf("%3d/ %s %s\n", i+1, key, result)
 			}
 		},
 	})

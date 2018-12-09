@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/mediocregopher/radix.v2/redis"
+	"github.com/mediocregopher/radix.v2/pool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	_db "github.com/rkjdid/gocx/db"
@@ -30,11 +30,15 @@ var (
 			scraper.Debug = debug
 
 			// init db connection
-			redisConn, err := redis.Dial("tcp", redisAddr)
+			//redisConn, err := redis.Dial("tcp", redisAddr)
+			//if err != nil {
+			//	log.Fatalln("redis dial:", err)
+			//}
+			p, err := pool.New("tcp", redisAddr, 12)
 			if err != nil {
-				log.Fatalln("redis dial:", err)
+				log.Fatalln("redis pool:", err)
 			}
-			db = &_db.RedisDriver{Conn: redisConn}
+			db = &_db.RedisDriver{Pool: p}
 
 			// init prometheus
 			prometheus.MustRegister(signals, trades)
@@ -82,7 +86,7 @@ func init() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use: "flushdb",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := db.Conn.Cmd("flushdb").Err
+			err := db.Pool.Cmd("flushdb").Err
 			if err != nil {
 				log.Fatalln("flushdb", err)
 			}

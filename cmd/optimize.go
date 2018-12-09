@@ -9,11 +9,18 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 )
 
 var (
+	saConfig = SimulatedAnnealing{
+		Steps: 5000,
+		TMax:  20000,
+		TMin:  2.5,
+	}
+
 	optimizeCmd = &cobra.Command{
 		Use:   "optimize",
 		Short: "Optimize a strategy",
@@ -21,47 +28,36 @@ var (
 
 Loads hash result from a previous backtest, and optimize from
 there. It can run for a while depending on optimizer config and strat.Backtest..`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			hash := args[0]
+			var hash string
+			if len(args) == 0 {
+				hash = "all"
+			} else {
+				hash = args[0]
+			}
+			if hash == "all" {
+				keys, err := db.ZREVRANGE(zkey, 0, n)
+				if err != nil {
+					log.Fatalf("db.ZREVRANGE: %s", err)
+				}
+				for _, key := range keys {
+					t0 := time.Now()
+					log.Printf("optimize %s", key)
+					err = Optimize(key)
+					if err != nil {
+						log.Printf("optimize %s: %s", key, err)
+					} else {
+						log.Printf("done %s", time.Since(t0))
+					}
+				}
+				os.Exit(0)
+			}
 			if strings.Index(hash, NewavePrefix) == 0 {
-				var nwr NewaveResult
-				err := db.LoadJSON(hash, &nwr)
+				err := Optimize(hash)
 				if err != nil {
-					log.Fatalf("couldn't load %s: %s", hash, err)
+					log.Fatalf("optimize %s: %s", hash, err)
 				}
-				rank0, _ := db.ZRANK(zkey, hash)
-				log.Printf("initial state: %s", nwr.String())
-				log.Printf("rank %d", rank0)
-
-				sa := SimulatedAnnealing{
-					Steps: 10000,
-					TMax:  25000,
-					TMin:  2.5,
-				}
-				cfg := nwr.Config
-				res, err := sa.Optimize(&NewaveResult{Config: cfg})
-				if res != nil {
-					best := res.(*NewaveResult)
-					hash, _, err := best.Digest()
-					if err != nil {
-						log.Fatalf("couldn't digest result: %s", err)
-					}
-					_, err = db.SaveZScorer(best, "optimized")
-					if err != nil {
-						log.Println("redis set:", err)
-					}
-					log.Printf("best: %s", best)
-					rank, _ := db.ZRANK(zkey, hash)
-					log.Printf("rank %d", rank)
-					rawJson, _ := json.MarshalIndent(best, "    ", "  ")
-					log.Printf("\n%s", rawJson)
-					fmt.Println(best.Details())
-				}
-				if err != nil {
-					log.Fatalf("stopped: %s", err)
-				}
-				return
 			}
 			log.Fatalf("unsupported hash prefix: %s", hash)
 		},
@@ -82,9 +78,42 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 )
 
 func init() {
-	//optimizeCmd.PersistentFlags().IntVarP(
-	//	&optimizeMax, "max", "", 100, "maximum number of optimize iterations")
+	optimizeCmd.PersistentFlags().IntVarP(
+		&n, "n", "n", -1, "optimize top n results")
 	rand.Seed(time.Now().Unix())
+}
+
+func Optimize(hash string) error {
+	var nwr NewaveResult
+	err := db.LoadJSON(hash, &nwr)
+	if err != nil {
+		return fmt.Errorf("couldn't load %s: %s", hash, err)
+	}
+	rank0, _ := db.ZRANK(zkey, hash)
+	log.Printf("initial state: %s", nwr.String())
+	log.Printf("rank %d", rank0)
+
+	sa := saConfig
+	cfg := nwr.Config
+	res, err := sa.Optimize(&NewaveResult{Config: cfg})
+	if res != nil {
+		best := res.(*NewaveResult)
+		hash, _, err := best.Digest()
+		if err != nil {
+			return fmt.Errorf("couldn't digest result: %s", err)
+		}
+		_, err = db.SaveZScorer(best, "optimized")
+		if err != nil {
+			log.Println("redis set:", err)
+		}
+		log.Printf("best: %s", best)
+		rank, _ := db.ZRANK(zkey, hash)
+		log.Printf("rank %d", rank)
+		rawJson, _ := json.MarshalIndent(best, "    ", "  ")
+		log.Printf("\n%s", rawJson)
+		fmt.Println(best.Details())
+	}
+	return err
 }
 
 type SimulatedAnnealing struct {
@@ -99,6 +128,16 @@ func (sa *SimulatedAnnealing) Optimize(state AnnealingState) (best AnnealingStat
 	prevE := bestE
 	tempCoolingFactor := -math.Log(sa.TMax - sa.TMin)
 	temp := sa.TMax
+
+	attempts, accepts, improves, rejects := 0, 0, 0, 0
+	ticker := time.NewTicker(time.Second * 15)
+	go func() {
+		for range ticker.C {
+			log.Printf("temp: %.2f, total: %d, accepted: %d, improved: %d, rejected: %d",
+				temp, attempts, accepts, improves, rejects)
+		}
+	}()
+
 	for i := 0; i < sa.Steps; i++ {
 		saTotal.Inc()
 		temp = sa.TMax * math.Exp(tempCoolingFactor*float64(i)/float64(sa.Steps))

@@ -64,7 +64,7 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 		// re-run backtest from redis key
 		id := args[0]
 		if id == "all" {
-			keys, err := db.ZRANGE(zkey, 0, -1)
+			keys, err := db.ZREVRANGE(zkey, 0, -1)
 			if err != nil {
 				log.Fatalln("db.ZRANGE:", err)
 			}
