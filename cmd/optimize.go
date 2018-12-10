@@ -16,9 +16,9 @@ import (
 
 var (
 	saConfig = SimulatedAnnealing{
-		Steps: 5000,
-		TMax:  20000,
-		TMin:  2.5,
+		Steps: 2000,
+		TMax:  25000,
+		TMin:  2500,
 	}
 
 	optimizeCmd = &cobra.Command{
@@ -126,11 +126,12 @@ func (sa *SimulatedAnnealing) Optimize(state AnnealingState) (best AnnealingStat
 	bestE := state.Energy()
 	prev := state
 	prevE := bestE
-	tempCoolingFactor := -math.Log(sa.TMax - sa.TMin)
+	tempCoolingFactor := -math.Log2(sa.TMax - sa.TMin)
 	temp := sa.TMax
 
 	attempts, accepts, improves, rejects := 0, 0, 0, 0
-	ticker := time.NewTicker(time.Second * 15)
+	ticker := time.NewTicker(time.Second * 2)
+	defer ticker.Stop()
 	go func() {
 		for range ticker.C {
 			log.Printf("temp: %.2f, total: %d, accepted: %d, improved: %d, rejected: %d",
@@ -139,6 +140,7 @@ func (sa *SimulatedAnnealing) Optimize(state AnnealingState) (best AnnealingStat
 	}()
 
 	for i := 0; i < sa.Steps; i++ {
+		attempts++
 		saTotal.Inc()
 		temp = sa.TMax * math.Exp(tempCoolingFactor*float64(i)/float64(sa.Steps))
 		prev = state
@@ -147,13 +149,16 @@ func (sa *SimulatedAnnealing) Optimize(state AnnealingState) (best AnnealingStat
 		dE := E - prevE
 		if dE > 0 && math.Exp(-dE/temp) < randRangeF(0, 1.0) {
 			// restore
+			rejects++
 			state = prev
 			E = prevE
 		} else {
 			// accept
+			accepts++
 			saAccepted.Inc()
 			if dE < 0 {
 				// improved
+				improves++
 				saImproved.Inc()
 			}
 			if E < bestE {

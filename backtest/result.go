@@ -42,5 +42,5 @@ func (r Result) String() string {
 			wins++
 		}
 	}
-	return fmt.Sprintf("zscore: %5.3f, +pos: %2d, -pos: %2d", 100*r.ZScore(), wins, loses)
+	return fmt.Sprintf("zscore: %5.3f, total: %.1f%%, +pos: %2d, -pos: %2d", 100*r.ZScore(), 100*r.Score, wins, loses)
 }
