@@ -1,15 +1,12 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rkjdid/gocx/trading/strategy"
 	"github.com/spf13/cobra"
 	"log"
 	"math"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 )
@@ -20,6 +17,8 @@ var (
 		TMax:  25000,
 		TMin:  2500,
 	}
+
+	zkeyOptimized string
 
 	optimizeCmd = &cobra.Command{
 		Use:   "optimize",
@@ -51,35 +50,22 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 						log.Printf("done %s", time.Since(t0))
 					}
 				}
-				os.Exit(0)
-			}
-			if strings.Index(hash, NewavePrefix) == 0 {
+			} else if strings.Index(hash, NewavePrefix) == 0 {
 				err := Optimize(hash)
 				if err != nil {
 					log.Fatalf("optimize %s: %s", hash, err)
 				}
+			} else {
+				log.Fatalf("unsupported hash prefix: %s", hash)
 			}
-			log.Fatalf("unsupported hash prefix: %s", hash)
 		},
 	}
-
-	saAccepted = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "SA accepted",
-	})
-	saImproved = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "SA improved",
-	})
-	saTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "SA total",
-	})
-	saBestImproved = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "SA new bests",
-	})
 )
 
 func init() {
 	optimizeCmd.PersistentFlags().IntVarP(
 		&n, "n", "n", -1, "optimize top n results")
+	optimizeCmd.PersistentFlags().StringVar(&zkeyOptimized, "zkey2", "optimized", "zkey optimized results")
 	rand.Seed(time.Now().Unix())
 }
 
@@ -102,15 +88,14 @@ func Optimize(hash string) error {
 		if err != nil {
 			return fmt.Errorf("couldn't digest result: %s", err)
 		}
-		_, err = db.SaveZScorer(best, "optimized")
+		_, err = db.SaveZScorer(best, zkeyOptimized)
 		if err != nil {
 			log.Println("redis set:", err)
 		}
 		log.Printf("best: %s", best)
-		rank, _ := db.ZRANK(zkey, hash)
+		log.Printf("id: %s, rank %d", hash)
+		rank, _ := db.ZRANK(zkeyOptimized, hash)
 		log.Printf("rank %d", rank)
-		rawJson, _ := json.MarshalIndent(best, "    ", "  ")
-		log.Printf("\n%s", rawJson)
 		fmt.Println(best.Details())
 	}
 	return err
@@ -129,19 +114,20 @@ func (sa *SimulatedAnnealing) Optimize(state AnnealingState) (best AnnealingStat
 	tempCoolingFactor := -math.Log2(sa.TMax - sa.TMin)
 	temp := sa.TMax
 
-	attempts, accepts, improves, rejects := 0, 0, 0, 0
-	ticker := time.NewTicker(time.Second * 2)
+	attempts, accepts, improves, rejects, noBest, noImprove, resets := 0, 0, 0, 0, 0, 0, 0
+	ticker := time.NewTicker(time.Second * 20)
 	defer ticker.Stop()
 	go func() {
 		for range ticker.C {
-			log.Printf("temp: %.2f, total: %d, accepted: %d, improved: %d, rejected: %d",
-				temp, attempts, accepts, improves, rejects)
+			log.Printf("temp: %.2f, total: %d, accepted: %d, improved: %d, rejected: %d, resets: %d",
+				temp, attempts, accepts, improves, rejects, resets)
 		}
 	}()
 
 	for i := 0; i < sa.Steps; i++ {
 		attempts++
-		saTotal.Inc()
+		noImprove++
+		noBest++
 		temp = sa.TMax * math.Exp(tempCoolingFactor*float64(i)/float64(sa.Steps))
 		prev = state
 		state = state.Move()
@@ -155,19 +141,25 @@ func (sa *SimulatedAnnealing) Optimize(state AnnealingState) (best AnnealingStat
 		} else {
 			// accept
 			accepts++
-			saAccepted.Inc()
 			if dE < 0 {
 				// improved
 				improves++
-				saImproved.Inc()
+				noImprove = 0
 			}
 			if E < bestE {
 				// new best
 				log.Printf("new best: %.5f%%", -E*100)
-				saBestImproved.Inc()
 				bestE = E
 				best = state
+				noBest = 0
 			}
+		}
+		// if no improvement or no new best for a while:
+		//   - reset to best state
+		//   - set temperature to +5% (more states to visit)
+		if noBest > int(.3*float64(sa.Steps)) || noImprove > int(.10*float64(sa.Steps)) {
+			best = state
+			i += int(.05 * float64(sa.Steps))
 		}
 	}
 	return best, nil
