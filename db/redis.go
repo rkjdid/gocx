@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/mediocregopher/radix.v2/pool"
 	"github.com/mediocregopher/radix.v2/redis"
+	"log"
 	"time"
 )
 
@@ -45,7 +46,11 @@ func (d *RedisDriver) SET(id string, v interface{}) error {
 }
 
 func (d *RedisDriver) ZADD(key string, id string, score float64) error {
-	return d.Pool.Cmd("ZADD", key, score, id).Err
+	err := d.Pool.Cmd("ZADD", key, score, id).Err
+	if err == nil {
+		log.Printf("saved %s[%s]", key, id)
+	}
+	return err
 }
 
 func (d *RedisDriver) ZRANK(hash string, id string) (int, error) {

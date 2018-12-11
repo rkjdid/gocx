@@ -31,6 +31,9 @@ type NewaveResult struct {
 }
 
 var (
+	cfgNewave   string
+	defaultMACD = strategy.MACDOpts{12, 26, 9}
+
 	newaveCmd = TraverseRunHooks(&cobra.Command{
 		Use:   "newave",
 		Short: "Newave strategy original",
@@ -48,10 +51,43 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			newaveBaseCfg := Newave(x, "", "", ttf, ttf2, defaultMACD, defaultMACD, tp, sl, tfrom, tto)
+			if cfgNewave != "" {
+				var res NewaveResult
+				err := db.LoadJSON(cfgNewave, &res)
+				if err != nil {
+					log.Fatalf("error loading config: %s", err)
+				}
+				newaveBaseCfg = res.Config
+
+				// overwrite conf values with flag value, if explicitly set
+				if cmd.Flags().Changed("tf") {
+					newaveBaseCfg.Timeframe = ttf
+				}
+				if cmd.Flags().Changed("tf2") {
+					newaveBaseCfg.TimeframeSlow = ttf2
+				}
+				if cmd.Flags().Changed("x") {
+					newaveBaseCfg.Exchange = x
+				}
+				if cmd.Flags().Changed("from") {
+					newaveBaseCfg.From = tfrom
+				}
+				if cmd.Flags().Changed("to") {
+					newaveBaseCfg.To = tto
+				}
+				if cmd.Flags().Changed("tp") {
+					newaveBaseCfg.TakeProfit = tp
+				}
+				if cmd.Flags().Changed("sl") {
+					newaveBaseCfg.StopLoss = sl
+				}
+			}
+
 			if len(args) == 0 {
-				NewaveTop(n)
+				NewaveTop(newaveBaseCfg, n)
 			} else if len(args) == 2 {
-				NewaveOne(args[0], args[1])
+				RunNewaveFor(newaveBaseCfg, args[0], args[1])
 			}
 		},
 	})
@@ -59,9 +95,11 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 
 func init() {
 	newaveCmd.LocalFlags().StringVar(&tf2, "tf2", "", tfFlagHelper())
+	newaveCmd.LocalFlags().StringVar(&cfgNewave, "cfg", "",
+		"load config values from provided <hash> and use if as default, explicit flags will overwrite default from cfg")
 }
 
-func NewaveTop(n int) {
+func NewaveTop(cfg NewaveConfig, n int) {
 	tickers, err := binance.FetchTopTickers("", "BTC")
 	if err != nil {
 		log.Fatal(err)
@@ -70,21 +108,17 @@ func NewaveTop(n int) {
 		n = len(tickers)
 	}
 	for _, v := range tickers[:n] {
-		NewaveOne(v.Base, v.Quote)
+		RunNewaveFor(cfg, v.Base, v.Quote)
 	}
 }
 
-func NewaveOne(bcur, qcur string) (*NewaveResult, error) {
-	macd := strategy.MACDOpts{12, 16, 9}
-	res, err := Newave(x, bcur, qcur, ttf, ttf2, macd, macd, tp, sl, tfrom, tto).Backtest()
+func RunNewave(cfg NewaveConfig) (*NewaveResult, error) {
+	res, err := cfg.Backtest()
 	if err != nil {
-		log.Printf("Newave %s:%s%s - %s", x, bcur, qcur, err)
+		log.Printf("Newave %s:%s%s - %s", x, cfg.Base, cfg.Quote, err)
 		return nil, err
 	}
-	for _, p := range res.Positions {
-		fmt.Println(p)
-	}
-	fmt.Println(res)
+	fmt.Println(res.Details())
 
 	// save to redis
 	_, err = db.SaveZScorer(res, zkey)
@@ -94,12 +128,18 @@ func NewaveOne(bcur, qcur string) (*NewaveResult, error) {
 	return res, err
 }
 
+func RunNewaveFor(cfg NewaveConfig, bcur, qcur string) (*NewaveResult, error) {
+	cfg.Base = bcur
+	cfg.Quote = qcur
+	return RunNewave(cfg)
+}
+
 func Newave(x, bcur, qcur string,
 	tf, tf2 backtest.Timeframe,
 	macdFast, macdSlow strategy.MACDOpts,
 	tp, sl float64,
-	from, to time.Time) *NewaveConfig {
-	return &NewaveConfig{
+	from, to time.Time) NewaveConfig {
+	return NewaveConfig{
 		Source: backtest.Source{
 			Exchange: x,
 			Base:     bcur, Quote: qcur, Timeframe: tf, From: from, To: to,

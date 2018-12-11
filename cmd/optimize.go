@@ -90,13 +90,12 @@ func Optimize(hash string) error {
 		}
 		_, err = db.SaveZScorer(best, zkeyOptimized)
 		if err != nil {
-			log.Println("redis set:", err)
+			log.Println("redis save:", err)
 		}
 		log.Printf("best: %s", best)
-		log.Printf("id: %s, rank %d", hash)
-		rank, _ := db.ZRANK(zkeyOptimized, hash)
-		log.Printf("rank %d", rank)
 		fmt.Println(best.Details())
+		rank, _ := db.ZRANK(zkeyOptimized, hash)
+		log.Printf("id: %s, rank %d", hash, rank)
 	}
 	return err
 }
