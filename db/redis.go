@@ -57,11 +57,11 @@ func (d *RedisDriver) ZREVANK(hash string, id string) (int, error) {
 }
 
 func (d *RedisDriver) ZRANGE(key string, i, j int) ([]string, error) {
-	return d.cmdList("ZRANGE", key, 0, -1)
+	return d.cmdList("ZRANGE", key, 0, j)
 }
 
 func (d *RedisDriver) ZREVRANGE(key string, i, j int) ([]string, error) {
-	return d.cmdList("ZREVRANGE", key, 0, -1)
+	return d.cmdList("ZREVRANGE", key, 0, j)
 }
 
 func (d *RedisDriver) EXPIRE(key string, ttl time.Duration) error {
