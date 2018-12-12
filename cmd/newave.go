@@ -117,9 +117,11 @@ func RunNewave(cfg NewaveConfig) (*NewaveResult, error) {
 	fmt.Println(res.Details())
 
 	// save to redis
-	_, err = db.SaveZScorer(res, zkey)
-	if err != nil {
-		log.Println("db: error saving backtest result:", err)
+	if !dryRun {
+		_, err = db.SaveZScorer(res, zkey)
+		if err != nil {
+			log.Println("db: error saving backtest result:", err)
+		}
 	}
 	return res, err
 }

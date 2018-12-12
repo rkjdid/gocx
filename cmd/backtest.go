@@ -12,6 +12,7 @@ import (
 
 var (
 	chartFlag  bool
+	dryRun     bool
 	x          string
 	from, to   string
 	tfrom, tto time.Time
@@ -85,10 +86,12 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 					continue
 				}
 				fmt.Println(res.Details())
-				// update db
-				_, err = db.SaveZScorer(res, zkey)
-				if err != nil {
-					log.Printf("save: %s", err)
+				if !dryRun {
+					// update db
+					_, err = db.SaveZScorer(res, zkey)
+					if err != nil {
+						log.Printf("save: %s", err)
+					}
 				}
 			}
 		} else if strings.Index(id, NewavePrefix+":") == 0 {
@@ -97,10 +100,12 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 				log.Fatalln(err)
 			}
 			fmt.Println(res.Details())
-			// update db
-			_, err = db.SaveZScorer(res, zkey)
-			if err != nil {
-				log.Printf("save: %s", err)
+			if !dryRun {
+				// update db
+				_, err = db.SaveZScorer(res, zkey)
+				if err != nil {
+					log.Printf("save: %s", err)
+				}
 			}
 		} else {
 			log.Fatalf("unsupported hash prefix: %s", id)
@@ -110,6 +115,7 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 
 func init() {
 	backtestCmd.PersistentFlags().BoolVar(&chartFlag, "chart", false, "chart executions")
+	backtestCmd.PersistentFlags().BoolVar(&dryRun, "dry", false, "do not save to redis")
 	backtestCmd.PersistentFlags().IntVarP(&n, "n", "n", 10, "backtest top n markets")
 	backtestCmd.PersistentFlags().StringVar(&from, "from", "", "from date: dd-mm-yyyy")
 	backtestCmd.PersistentFlags().StringVarP(&x, "exchange", "x", "binance", "exchange to scrape from")
