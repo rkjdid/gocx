@@ -182,8 +182,8 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 	}
 
 	// init & feed strategy
-	macdFast := n.MACDFast.NewMACD()
-	macdSlow := n.MACDSlow.NewMACD()
+	macdFast := n.MACDFast.NewMACDCross()
+	macdSlow := n.MACDSlow.NewMACDCross()
 	if histFast.Timeframe.ToDuration() > histSlow.Timeframe.ToDuration() {
 		histFast, histSlow = histSlow, histFast
 		macdFast, macdSlow = macdSlow, macdFast
@@ -223,10 +223,12 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 			}
 		}
 
-		sig1 = macdFast.AddTick(x)
+		macdFast.AddTick(x)
+		sig1 = macdFast.Signal()
 		if len(histSlow.Data) > j+1 && x.Timestamp.T().After(histSlow.Data[j+1].Timestamp.T()) {
 			j += 1
-			sig2 = macdSlow.AddTick(histSlow.Data[j])
+			macdSlow.AddTick(histSlow.Data[j])
+			sig2 = macdSlow.Signal()
 		}
 
 		var trigger strategy.Signal

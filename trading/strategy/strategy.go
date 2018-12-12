@@ -8,7 +8,8 @@ import (
 )
 
 type Strategy interface {
-	AddTick(ts.OHLCV) Signal
+	AddTick(ts.OHLCV)
+	Signal() Signal
 }
 
 type Signal struct {
