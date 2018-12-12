@@ -18,6 +18,7 @@ var (
 	tf, tf2    string
 	ttf, ttf2  backtest.Timeframe
 	tp, sl     float64
+	cfgHash    string
 
 	tformat = "02-01-2006"
 )
@@ -107,6 +108,8 @@ func init() {
 	backtestCmd.PersistentFlags().StringVar(&tf, "tf", scraper.TfDay, tfFlagHelper())
 	backtestCmd.PersistentFlags().Float64Var(&tp, "tp", 0.1, "take profit")
 	backtestCmd.PersistentFlags().Float64Var(&sl, "sl", 0.025, "stop loss")
+	backtestCmd.PersistentFlags().StringVar(&cfgHash, "cfg", "",
+		"load config values from provided <hash> and use if as default, explicit flags will overwrite default from cfg")
 
 	backtestCmd.AddCommand(newaveCmd)
 }
