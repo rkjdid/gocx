@@ -19,6 +19,7 @@ var (
 	ttf, ttf2  backtest.Timeframe
 	tp, sl     float64
 	cfgHash    string
+	source     backtest.Source
 
 	tformat = "02-01-2006"
 )
@@ -57,6 +58,14 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 			if err != nil {
 				return fmt.Errorf("parsing -to: %s\n", err)
 			}
+		}
+		source = backtest.Source{
+			Exchange:  x,
+			Base:      "",
+			Quote:     "",
+			From:      tfrom,
+			To:        tto,
+			Timeframe: ttf,
 		}
 		return nil
 	},

@@ -12,7 +12,6 @@ import (
 	"gonum.org/v1/plot/vg"
 	"log"
 	"math"
-	"time"
 )
 
 const NewavePrefix = "newave"
@@ -50,7 +49,7 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			newaveBaseCfg := Newave(x, "", "", ttf, ttf2, defaultMACD, defaultMACD, tp, sl, tfrom, tto)
+			newaveBaseCfg := Newave(source, ttf2, defaultMACD, defaultMACD, tp, sl)
 			if cfgHash != "" {
 				var res NewaveResult
 				err := db.LoadJSON(cfgHash, &res)
@@ -131,16 +130,11 @@ func RunNewaveFor(cfg NewaveConfig, bcur, qcur string) (*NewaveResult, error) {
 	return RunNewave(cfg)
 }
 
-func Newave(x, bcur, qcur string,
-	tf, tf2 backtest.Timeframe,
+func Newave(source backtest.Source, tf2 backtest.Timeframe,
 	macdFast, macdSlow strategy.MACDOpts,
-	tp, sl float64,
-	from, to time.Time) NewaveConfig {
+	tp, sl float64) NewaveConfig {
 	return NewaveConfig{
-		Source: backtest.Source{
-			Exchange: x,
-			Base:     bcur, Quote: qcur, Timeframe: tf, From: from, To: to,
-		},
+		Source: source,
 		Profile: trading.Profile{
 			TakeProfit: tp,
 			StopLoss:   sl,
