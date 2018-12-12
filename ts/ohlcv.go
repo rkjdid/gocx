@@ -266,13 +266,33 @@ func CleanFloats(data []float64, fn func(left, right float64) float64,
 	out = make([]float64, len(tf))
 	copy(out, tf)
 	if len(out) <= 1 {
-		return out, i, j, 0
+		if len(out) == 1 && math.IsNaN(out[0]) {
+			out[0] = 0
+			k = 1
+		}
+		return out, i, j, k
 	}
-	for x := 1; x < len(out)-1; x++ {
-		if out[x] == 0 {
+
+	var x int
+	var isZero = func(f float64) bool {
+		return f == 0 || math.IsNaN(f)
+	}
+	// first point
+	if isZero(out[x]) {
+		k++
+		out[x] = out[x+1]
+	}
+	// middle values
+	for x = 1; x < len(out)-1; x++ {
+		if isZero(out[x]) {
 			k++
 			out[x] = fn(out[x-1], out[x+1])
 		}
+	}
+	// last point
+	if isZero(out[x]) {
+		k++
+		out[x] = out[x-1]
 	}
 	return out, i, j, k
 }
