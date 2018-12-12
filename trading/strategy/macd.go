@@ -64,7 +64,7 @@ func (m *MACD) Compute() ([]float64, []float64, []float64) {
 }
 
 func (m *MACD) Draw() error {
-	chart.AddLines([]string{"macd", "signal"}, m.Data.ToXYer(m.cacheMACD, m.cacheSignal)...)
+	chart.AddLines([]string{"macd", "signal"}, m.Data.ToXYerSlice(m.cacheMACD, m.cacheSignal)...)
 	return nil
 }
 

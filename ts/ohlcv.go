@@ -88,13 +88,17 @@ func (o OHLCVs) XStepDuration() time.Duration {
 	return time.Time(o[1].Timestamp).Sub(time.Time(o[0].Timestamp))
 }
 
-func (o OHLCVs) ToXYer(data ...[]float64) (ts []plotter.XYer) {
+func (o OHLCVs) ToXYerSlice(data ...[]float64) (ts []plotter.XYer) {
 	for _, v := range data {
-		ts = append(ts, TimeSeries{
-			v, o.X0() + o.XStep()*float64(len(o)-len(v)), o.XStep(),
-		}.CleanCopy())
+		ts = append(ts, o.ToXYer(v))
 	}
 	return ts
+}
+
+func (o OHLCVs) ToXYer(data []float64) (xyer plotter.XYer) {
+	return TimeSeries{
+		data, o.X0() + o.XStep()*float64(len(o)-len(data)), o.XStep(),
+	}.CleanCopy()
 }
 
 // TrimLeft returns a slice with zero-elements removed from the beginning of o.
