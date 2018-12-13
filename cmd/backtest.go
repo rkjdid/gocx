@@ -28,7 +28,8 @@ var (
 var backtestCmd = TraverseRunHooks(&cobra.Command{
 	Use:   "backtest",
 	Short: "Backtest a strategy on an asset",
-	Long:  `Needs a strategy, a config, an asset, a timeframe.. stuff like that`,
+	Long: `When no sub-command is specified,
+backtest is used to run again existing results from db.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		ttf, err = backtest.ParseTf(tf)
@@ -70,12 +71,16 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 		}
 		return nil
 	},
-	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// re-run backtest from redis key
-		id := args[0]
-		if id == "all" {
-			keys, err := db.ZREVRANGE(zkey, 0, -1)
+		// no args defaults to "all" special id
+		var id string
+		if len(args) == 0 {
+			id = "all"
+		} else {
+			id = args[0]
+		}
+		if id == "all" || id == "top" {
+			keys, err := db.ZREVRANGE(zkey, 0, n)
 			if err != nil {
 				log.Fatalln("db.ZRANGE:", err)
 			}
