@@ -3,8 +3,10 @@ package cmd
 import (
 	"fmt"
 	"github.com/rkjdid/gocx/backtest"
+	_db "github.com/rkjdid/gocx/db"
 	"github.com/rkjdid/gocx/scraper"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"log"
 	"strings"
 	"time"
@@ -12,7 +14,7 @@ import (
 
 var (
 	chartFlag  bool
-	dryRun     bool
+	saveFlag   bool
 	x          string
 	from, to   string
 	tfrom, tto time.Time
@@ -79,48 +81,55 @@ backtest is used to run again existing results from db.`,
 		} else {
 			id = args[0]
 		}
+
+		// what we do with the result
+		printSave := func(res _db.ZScorer, details bool) {
+			msg := fmt.Sprint(res)
+			if details {
+				if v, ok := res.(Details); ok {
+					msg = v.Details()
+				}
+			}
+			fmt.Println(msg)
+
+			if saveFlag {
+				_, err := db.SaveZScorer(res, zkey)
+				if err != nil {
+					log.Printf("save: %s", err)
+				}
+			}
+		}
+
 		if id == "all" || id == "top" {
 			keys, err := db.ZREVRANGE(zkey, 0, n)
 			if err != nil {
 				log.Fatalln("db.ZRANGE:", err)
 			}
 			for _, key := range keys {
-				res, err := rerunNewave(key)
+				res, err := rerun(key)
 				if err != nil {
 					log.Println(key, err)
 					continue
 				}
-				fmt.Println(res.Details())
-				if !dryRun {
-					// update db
-					_, err = db.SaveZScorer(res, zkey)
-					if err != nil {
-						log.Printf("save: %s", err)
-					}
-				}
+				printSave(res, false)
 			}
-		} else if strings.Index(id, NewavePrefix+":") == 0 {
-			res, err := rerunNewave(id)
+		} else {
+			res, err := rerun(id)
 			if err != nil {
 				log.Fatalln(err)
 			}
-			fmt.Println(res.Details())
-			if !dryRun {
-				// update db
-				_, err = db.SaveZScorer(res, zkey)
-				if err != nil {
-					log.Printf("save: %s", err)
-				}
-			}
-		} else {
-			log.Fatalf("unsupported hash prefix: %s", id)
+			printSave(res, true)
 		}
 	},
 })
 
+func addSaveFlag(set *pflag.FlagSet) {
+	set.BoolVar(&saveFlag, "save", false, "save results to redis")
+}
+
 func init() {
 	backtestCmd.PersistentFlags().BoolVar(&chartFlag, "chart", false, "chart executions")
-	backtestCmd.PersistentFlags().BoolVar(&dryRun, "dry", false, "do not save to redis")
+	addSaveFlag(backtestCmd.PersistentFlags())
 	backtestCmd.PersistentFlags().IntVarP(&n, "n", "n", 10, "backtest top n markets")
 	backtestCmd.PersistentFlags().StringVar(&from, "from", "", "from date: dd-mm-yyyy")
 	backtestCmd.PersistentFlags().StringVarP(&x, "exchange", "x", "binance", "exchange to scrape from")
@@ -131,7 +140,26 @@ func init() {
 	backtestCmd.PersistentFlags().StringVar(&cfgHash, "cfg", "",
 		"load config values from provided <hash> and use if as default, explicit flags will overwrite default from cfg")
 
-	backtestCmd.AddCommand(newaveCmd)
+	backtestCmd.AddCommand(newaveCmd, vwapCmd)
+}
+
+type Details interface {
+	Details() string
+}
+
+func rerun(key string) (_db.ZScorer, error) {
+	var prefix string
+	fields := strings.FieldsFunc(key, func(r rune) bool {
+		return r == ':'
+	})
+	if len(fields) > 0 {
+		prefix = fields[0]
+	}
+	switch prefix {
+	case NewavePrefix:
+		return rerunNewave(key)
+	}
+	return nil, fmt.Errorf("unsupported hash prefix: %s", prefix)
 }
 
 func rerunNewave(key string) (*NewaveResult, error) {
@@ -140,7 +168,21 @@ func rerunNewave(key string) (*NewaveResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("LoadJSON: %s", err)
 	}
-	return nwr.Config.Backtest()
+	cfg := nwr.Config
+	if cfgHash != "" {
+		var res NewaveResult
+		err := db.LoadJSON(cfgHash, &res)
+		if err != nil {
+			log.Fatalf("error loading config: %s", err)
+		}
+		cfg = res.Config
+	}
+	return rerunNewaveWith(nwr, cfg)
+}
+
+func rerunNewaveWith(nwr NewaveResult, cfg NewaveConfig) (*NewaveResult, error) {
+	cfg.Source = nwr.Config.Source
+	return cfg.Backtest()
 }
 
 func tfFlagHelper() string {

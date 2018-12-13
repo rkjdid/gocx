@@ -66,7 +66,7 @@ func init() {
 	optimizeCmd.PersistentFlags().IntVarP(
 		&n, "n", "n", -1, "optimize top n results")
 	optimizeCmd.PersistentFlags().StringVar(&zkeyOptimized, "zkey2", "optimized", "zkey optimized results")
-	optimizeCmd.PersistentFlags().BoolVar(&dryRun, "dry", false, "do not save result to redis")
+	addSaveFlag(optimizeCmd.PersistentFlags())
 	rand.Seed(time.Now().Unix())
 }
 
@@ -89,7 +89,7 @@ func Optimize(hash string) error {
 		if err != nil {
 			return fmt.Errorf("couldn't digest result: %s", err)
 		}
-		if !dryRun {
+		if saveFlag {
 			_, err = db.SaveZScorer(best, zkeyOptimized)
 			if err != nil {
 				log.Println("redis save:", err)

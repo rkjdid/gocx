@@ -93,6 +93,7 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 
 func init() {
 	newaveCmd.LocalFlags().StringVar(&tf2, "tf2", "", tfFlagHelper())
+	// todo add macdFast, macdSlow flags
 }
 
 func NewaveTop(cfg NewaveConfig, n int) {
@@ -116,8 +117,7 @@ func RunNewave(cfg NewaveConfig) (*NewaveResult, error) {
 	}
 	fmt.Println(res.Details())
 
-	// save to redis
-	if !dryRun {
+	if saveFlag {
 		_, err = db.SaveZScorer(res, zkey)
 		if err != nil {
 			log.Println("db: error saving backtest result:", err)

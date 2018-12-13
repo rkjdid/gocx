@@ -16,6 +16,7 @@ var (
 		Use:   "top",
 		Short: "Display top items",
 		Long:  `Display best scoring strategies in redisConn or binance top markets`,
+		Run:   strategiesCmd.Run,
 	})
 
 	strategiesCmd = TraverseRunHooks(&cobra.Command{
