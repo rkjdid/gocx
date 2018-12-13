@@ -24,7 +24,7 @@ var (
 		Short: "Display best scoring backtest executions",
 		Long:  `ZREVRANGE on the sorted set holding strat backtest and display corresponding results`,
 		Run: func(cmd *cobra.Command, args []string) {
-			keys, err := db.ZREVRANGE(zkey, 0, n-1)
+			keys, err := db.ZREVRANGE(zkey, 0, n)
 			if err != nil {
 				log.Fatalf("db.ZREVRANGE: %s", err)
 			}

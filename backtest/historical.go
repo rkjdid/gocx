@@ -15,6 +15,11 @@ type Source struct {
 	Timeframe   Timeframe
 }
 
+func (s Source) String() string {
+	return fmt.Sprintf("%8s - %s - %s to %s", fmt.Sprint(s.Base, s.Quote), s.Timeframe,
+		s.From.Format("02/01/06"), s.To.Format("02/01/2006"))
+}
+
 type Historical struct {
 	Source
 	Data ts.OHLCVs

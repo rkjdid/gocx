@@ -27,6 +27,7 @@ type NewaveConfig struct {
 type NewaveResult struct {
 	Config NewaveConfig
 	backtest.Result
+	Id string
 }
 
 var (
@@ -278,24 +279,27 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 }
 
 // Digest is db.Digester implementation with json data and a id-hash.
-func (nwr NewaveResult) Digest() (id string, data []byte, err error) {
-	return _db.JSONDigest(
+func (nwr *NewaveResult) Digest() (id string, data []byte, err error) {
+	id, data, err = _db.JSONDigest(
 		fmt.Sprintf("%s:%s%s", NewavePrefix, nwr.Config.Base, nwr.Config.Quote),
 		nwr,
 	)
+	nwr.Id = id
+	return
 }
 
 func (n NewaveConfig) String() string {
-	return fmt.Sprintf("%8s - %s - %s to %s - macd(%s, %s) & macd(%s, %s) - tp %.1f%% sl %.1f%%",
-		fmt.Sprint(n.Base, n.Quote), n.Timeframe,
-		n.From.Format("02/01/06"), n.To.Format("02/01/2006"),
+	return fmt.Sprintf("macd(%s, %s) & macd(%s, %s) - tp %.1f%% sl %.1f%%",
 		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
 		n.TakeProfit*100, -n.StopLoss*100,
 	)
 }
 
 func (nwr NewaveResult) String() string {
-	return fmt.Sprintf("%s -> %s", nwr.Config, nwr.Result)
+	if nwr.Id == "" {
+		nwr.Digest()
+	}
+	return fmt.Sprintf("%s | %s | %s | %s", nwr.Id, nwr.Config.Source, nwr.Config, nwr.Result)
 }
 
 func (nwr NewaveResult) Details() string {
