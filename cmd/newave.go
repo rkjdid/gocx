@@ -303,5 +303,6 @@ func (nwr NewaveResult) Details() string {
 	for _, p := range nwr.Positions {
 		s += fmt.Sprintln(p)
 	}
-	return s + fmt.Sprintln(nwr)
+	hash, _, _ := nwr.Digest()
+	return s + fmt.Sprintln(nwr) + fmt.Sprintln("id:", hash)
 }
