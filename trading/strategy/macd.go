@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const MaxLookback = 16000
-
 type MACDOpts struct {
 	Fast, Slow, SignalPeriod int
 }
@@ -31,8 +29,8 @@ type MACD struct {
 	Data       ts.OHLCVs
 	LastSignal Signal
 
-	cacheOHLCV                        ts.OHLCV
-	cacheMACD, cacheSignal, cacheHist []float64
+	LastOHLCV                   ts.OHLCV
+	OutMACD, OutSignal, OutHist []float64
 }
 
 func NewMACD(f, s, signalPeriod int) *MACD {
@@ -42,25 +40,37 @@ func NewMACD(f, s, signalPeriod int) *MACD {
 			Slow:         s,
 			SignalPeriod: signalPeriod,
 		},
-		Data: make(ts.OHLCVs, 0, MaxLookback),
+		Data: make(ts.OHLCVs, 0, s),
 	}
 }
 
 func (m *MACD) AddTick(ohlcv ts.OHLCV) {
-	m.cacheOHLCV = ohlcv
+	m.LastOHLCV = ohlcv
+	m.Data = append(m.Data, ohlcv)
 	if len(m.Data) <= m.Slow {
-		m.Data = append(m.Data, ohlcv)
 		return
-	}
-	if len(m.Data) > MaxLookback {
+		// this value of 5*m.Slow was chosen because it
+		// it yields the same results on the same input data.
+		// Really not sure what to think of it
+	} else if len(m.Data) > 5*m.Slow {
 		m.Data = m.Data[1:]
 	}
-	m.Data = append(m.Data, ohlcv)
-	m.cacheMACD, m.cacheSignal, m.cacheHist = m.Compute()
+	v, s, h := m.ComputeLast()
+	m.OutMACD = append(m.OutMACD, v)
+	m.OutSignal = append(m.OutSignal, s)
+	m.OutHist = append(m.OutHist, h)
 }
 
 func (m *MACD) Compute() ([]float64, []float64, []float64) {
 	return talib.Macd(m.Data.Close(), m.Fast, m.Slow, m.SignalPeriod)
+}
+
+func (m *MACD) ComputeLast() (float64, float64, float64) {
+	a, b, c := m.Compute()
+	if len(a) == 0 || len(b) == 0 || len(c) == 0 {
+		panic("bad length")
+	}
+	return a[len(a)-1], b[len(b)-1], c[len(c)-1]
 }
 
 func (m *MACD) Draw() error {
@@ -84,21 +94,21 @@ func (m *MACDCross) AddTick(ohlcv ts.OHLCV) {
 }
 
 func (m *MACDCross) Signal() Signal {
-	if len(m.cacheHist) < 2 {
+	if len(m.OutHist) < 2 {
 		return NoSignal
 	}
-	x0, x := m.cacheHist[len(m.cacheHist)-2], m.cacheHist[len(m.cacheHist)-1]
+	x0, x := m.OutHist[len(m.OutHist)-2], m.OutHist[len(m.OutHist)-1]
 	if x0 > 0 && x < 0 {
 		m.LastSignal = Signal{
 			Action:   Sell,
-			Time:     time.Time(m.cacheOHLCV.Timestamp),
+			Time:     time.Time(m.LastOHLCV.Timestamp),
 			Strength: 1,
 		}
 		return m.LastSignal
 	} else if x0 < 0 && x > 0 {
 		m.LastSignal = Signal{
 			Action:   Buy,
-			Time:     time.Time(m.cacheOHLCV.Timestamp),
+			Time:     time.Time(m.LastOHLCV.Timestamp),
 			Strength: 1,
 		}
 		return m.LastSignal
