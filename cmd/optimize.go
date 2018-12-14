@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/rkjdid/gocx/trading/strategy"
+	"github.com/rkjdid/gocx/util"
 	"github.com/spf13/cobra"
 	"log"
 	"math"
@@ -135,7 +136,7 @@ func (sa *SimulatedAnnealing) Optimize(state AnnealingState) (best AnnealingStat
 		state = state.Move()
 		E := state.Energy()
 		dE := E - prevE
-		if dE > 0 && math.Exp(-dE/temp) < randRangeF(0, 1.0) {
+		if dE > 0 && math.Exp(-dE/temp) < util.RandRangeF(0, 1.0) {
 			// restore
 			rejects++
 			state = prev
@@ -180,19 +181,19 @@ func (nwr *NewaveResult) Move() AnnealingState {
 	// todo explore timeframes space also ?
 
 	// risk parameters search space
-	next.Config.StopLoss += randRangeF(-0.01, 0.01)
-	next.Config.TakeProfit += randRangeF(-0.01, 0.01)
-	fixRangeF(&next.Config.StopLoss, 0.01, .618)
-	fixRangeF(&next.Config.TakeProfit, 0.05, .618)
+	next.Config.StopLoss += util.RandRangeF(-0.01, 0.01)
+	next.Config.TakeProfit += util.RandRangeF(-0.01, 0.01)
+	util.FixRangeLinearF(&next.Config.StopLoss, 0.01, .618)
+	util.FixRangeLinearF(&next.Config.TakeProfit, 0.05, .618)
 
 	// macds parameters search space
 	for _, opts := range []*strategy.MACDOpts{&next.Config.MACDFast, &next.Config.MACDSlow} {
-		opts.Fast += randRange(-1, 1)
-		opts.Slow += randRange(-1, 1)
-		opts.SignalPeriod += randRange(-1, 1)
-		fixRange(&opts.Fast, 2, 21)
-		fixRange(&opts.Slow, 13, 89)
-		fixRange(&opts.SignalPeriod, 2, 34)
+		opts.Fast += util.RandRange(-1, 1)
+		opts.Slow += util.RandRange(-1, 1)
+		opts.SignalPeriod += util.RandRange(-1, 1)
+		util.FixRangeLinear(&opts.Fast, 2, 21)
+		util.FixRangeLinear(&opts.Slow, 13, 89)
+		util.FixRangeLinear(&opts.SignalPeriod, 2, 34)
 
 		// swap values that crossed for macd.slow/fast
 		if opts.Fast > opts.Slow {
@@ -212,68 +213,4 @@ func (nwr *NewaveResult) Energy() float64 {
 	*nwr = *res
 	// in annealing sim, the lesser the energy the better
 	return -nwr.ZScore()
-}
-
-// helpers
-
-func randRangeF(min, max float64) float64 {
-	return min + rand.Float64()*(max-min)
-}
-
-func randRange(min, max int) int {
-	return rand.Intn(max-min) + min
-}
-
-// fixRangeF updates f if it is out-of-bond
-func fixRangeF(v *float64, min, max float64) {
-	if *v < min {
-		//*v = movOppositeF(*v, min)
-		//*v = midLinearF(min, max)
-		*v = midLog2F(min, max)
-	} else if *v > max {
-		//*v = movOppositeF(*v, max)
-		//*v = midLinearF(min, max)
-		*v = midLog2F(min, max)
-	}
-}
-
-// fixRange is like fixRangeF but for ints
-func fixRange(v *int, min, max int) {
-	if *v < min {
-		//*v = movOpposite(*v, min)
-		//*v = midLinear(min, max)
-		*v = midLog2(min, max)
-	} else if *v > max {
-		//*v = movOpposite(*v, max)
-		//*v = midLinear(min, max)
-		*v = midLog2(min, max)
-	}
-}
-
-func movOpposite(v int, bond int) int {
-	return 2*bond - v
-}
-
-func movOppositeF(v float64, bond float64) float64 {
-	return 2*bond - v
-}
-
-func midLinearF(min, max float64) float64 {
-	return (min + max) / 2
-}
-
-func midLog2F(min, max float64) float64 {
-	logMin := math.Log2(min)
-	logMax := math.Log2(max)
-	return math.Pow(2, logMin+(logMax-logMin)/2)
-}
-
-func midLinear(min, max int) int {
-	return (min + max) / 2
-}
-
-func midLog2(min, max int) int {
-	logMin := math.Log2(float64(min))
-	logMax := math.Log2(float64(max))
-	return int(math.Pow(2, logMin+(logMax-logMin)/2))
 }
