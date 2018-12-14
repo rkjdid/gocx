@@ -93,7 +93,7 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 )
 
 func init() {
-	newaveCmd.LocalFlags().StringVar(&tf2, "tf2", "", tfFlagHelper())
+	newaveCmd.Flags().StringVar(&tf2, "tf2", "", tfFlagHelper())
 	// todo add macdFast, macdSlow flags
 }
 
