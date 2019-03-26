@@ -86,7 +86,7 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 			if len(args) == 0 {
 				NewaveTop(newaveBaseCfg, n)
 			} else if len(args) == 2 {
-				RunNewaveFor(newaveBaseCfg, args[0], args[1])
+				_, _ = RunNewaveFor(newaveBaseCfg, args[0], args[1])
 			}
 		},
 	})
@@ -106,7 +106,7 @@ func NewaveTop(cfg NewaveConfig, n int) {
 		n = len(tickers)
 	}
 	for _, v := range tickers[:n] {
-		RunNewaveFor(cfg, v.Base, v.Quote)
+		_, _ = RunNewaveFor(cfg, v.Base, v.Quote)
 	}
 }
 
@@ -197,7 +197,6 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 	j := 0
 	var sig1, sig2, last strategy.Signal
 	for _, x := range histFast.Data {
-		// Positions management ?
 		// are we closing ?
 		if pos != nil && pos.Active() {
 			potentialNet := pos.NetOnClose(x.Close)
@@ -261,9 +260,9 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 
 	// draw chart
 	if chartFlag {
-		macdFast.Draw()
+		_ = macdFast.Draw()
 		chart.NextLineTheme()
-		macdSlow.Draw()
+		_ = macdSlow.Draw()
 		cname := fmt.Sprintf("img/newave_%s%s.png", n.Base, n.Quote)
 		width := vg.Length(math.Max(float64(len(histFast.Data)), 1200))
 		height := width / 1.77
@@ -297,7 +296,7 @@ func (n NewaveConfig) String() string {
 
 func (nwr NewaveResult) String() string {
 	if nwr.Id == "" {
-		nwr.Digest()
+		_, _, _ = nwr.Digest()
 	}
 	return fmt.Sprintf("%s | %s | %s | %s", nwr.Id, nwr.Config.Source, nwr.Config, nwr.Result)
 }

@@ -63,6 +63,9 @@ func RangeLinear(n, min, max int) []int {
 }
 
 func RangeLinearF(n int, min, max float64) []float64 {
+	if n <= 0 {
+		return nil
+	}
 	out := make([]float64, n)
 	step := (max - min) / (float64(n) + 1)
 	for i := 0; i < n; i++ {

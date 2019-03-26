@@ -16,6 +16,7 @@ type Signal struct {
 	Time     time.Time
 	Action   Action
 	Strength float64
+	Data     interface{}
 }
 
 var NoSignal Signal

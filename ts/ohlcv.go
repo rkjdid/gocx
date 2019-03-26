@@ -17,6 +17,10 @@ type OHLCV struct {
 	Volume    float64       `json:"volumefrom"`
 }
 
+func (o OHLCV) Pivot() float64 {
+	return (o.High + o.Low + o.Open) / 3
+}
+
 func (o OHLCV) IsZero() bool {
 	return o.Volume == 0 && o.Open == 0 && o.Close == 0
 }
@@ -177,6 +181,14 @@ func (o OHLCVs) Close() (val []float64) {
 	val = make([]float64, len(o))
 	for i, v := range o {
 		val[i] = v.Close
+	}
+	return val
+}
+
+func (o OHLCVs) Pivot() (val []float64) {
+	val = make([]float64, len(o))
+	for i, v := range o {
+		val[i] = v.Pivot()
 	}
 	return val
 }

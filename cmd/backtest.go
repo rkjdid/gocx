@@ -140,7 +140,7 @@ func init() {
 	backtestCmd.PersistentFlags().StringVar(&cfgHash, "cfg", "",
 		"load config values from provided <hash> and use if as default, explicit flags will overwrite default from cfg")
 
-	backtestCmd.AddCommand(newaveCmd, vwapCmd)
+	backtestCmd.AddCommand(newaveCmd)
 }
 
 type Details interface {
