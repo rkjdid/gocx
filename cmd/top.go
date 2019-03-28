@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/rkjdid/gocx/backtest"
-	"github.com/rkjdid/gocx/scraper/binance"
+	"github.com/rkjdid/gocx/backtest/scraper/binance"
 	"github.com/spf13/cobra"
 	"log"
 	"strings"

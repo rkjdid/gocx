@@ -14,14 +14,8 @@ import (
 )
 
 var (
-	Debug        = false
-	Client       = http.DefaultClient
-	TfToDuration = map[string]time.Duration{
-		TfMinute: time.Minute,
-		TfHour:   time.Hour,
-		TfDay:    time.Hour * 24,
-	}
-
+	Debug      = false
+	Client     = http.DefaultClient
 	curAliases = map[string]string{
 		"BCC": "BCH",
 	}
@@ -29,9 +23,6 @@ var (
 
 const (
 	CryptoCompareAPI = "https://min-api.cryptocompare.com/data/histo"
-	TfMinute         = "minute"
-	TfHour           = "hour"
-	TfDay            = "day"
 )
 
 type CryptoCompareResponse struct {
@@ -76,7 +67,7 @@ func FetchHistorical(exchange string, base, quote string, tf string, aggregate i
 		to = time.Now()
 	}
 
-	d, ok := TfToDuration[tf]
+	d, ok := ts.TfToDuration[tf]
 	if !ok {
 		return nil, fmt.Errorf("timeframe \"%s\" invalid or not supported", tf)
 	}

@@ -3,7 +3,7 @@ package binance
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rkjdid/gocx/scraper"
+	"github.com/rkjdid/gocx/backtest/scraper"
 	"log"
 	"net/http/httputil"
 	"sort"

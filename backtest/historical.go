@@ -2,8 +2,8 @@ package backtest
 
 import (
 	"fmt"
+	"github.com/rkjdid/gocx/backtest/scraper"
 	"github.com/rkjdid/gocx/db"
-	"github.com/rkjdid/gocx/scraper"
 	"github.com/rkjdid/gocx/ts"
 	"time"
 )
@@ -12,7 +12,7 @@ type Source struct {
 	Exchange    string
 	Base, Quote string
 	From, To    time.Time
-	Timeframe   Timeframe
+	Timeframe   ts.Timeframe
 }
 
 func (s Source) String() string {
@@ -25,7 +25,7 @@ type Historical struct {
 	Data ts.OHLCVs
 }
 
-func LoadHistorical(db *db.RedisDriver, x, bcur, qcur string, tf Timeframe, from, to time.Time) (*Historical, error) {
+func LoadHistorical(db *db.RedisDriver, x, bcur, qcur string, tf ts.Timeframe, from, to time.Time) (*Historical, error) {
 	meta := Source{
 		Exchange: x, Base: bcur, Quote: qcur, Timeframe: tf, From: from, To: to,
 	}

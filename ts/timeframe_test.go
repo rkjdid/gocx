@@ -1,7 +1,6 @@
-package backtest
+package ts
 
 import (
-	"github.com/rkjdid/gocx/scraper"
 	"testing"
 	"time"
 )
@@ -11,14 +10,14 @@ func TestParseTf(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if tf.Unit != scraper.TfHour || tf.N != 4 {
+	if tf.Unit != TfHour || tf.N != 4 {
 		t.Errorf("unexpected values 4h")
 	}
 	tf, err = ParseTf("m")
 	if err != nil {
 		t.Error(err)
 	}
-	if tf.Unit != scraper.TfMinute || tf.N != 1 {
+	if tf.Unit != TfMinute || tf.N != 1 {
 		t.Errorf("unexpected values m")
 	}
 }
@@ -26,7 +25,7 @@ func TestParseTf(t *testing.T) {
 func TestTimeframe_IsValid(t *testing.T) {
 	tf := Timeframe{
 		N:    2,
-		Unit: scraper.TfHour,
+		Unit: TfHour,
 	}
 	if !tf.IsValid() {
 		t.Errorf("h4 should be valid")
@@ -50,7 +49,7 @@ func TestDurationToTf(t *testing.T) {
 	if err != nil {
 		t.Errorf("2 day duration should be valid")
 	}
-	if tf.Unit != scraper.TfDay || tf.N != 2 {
+	if tf.Unit != TfDay || tf.N != 2 {
 		t.Errorf("unexpected value for 48h")
 	}
 }

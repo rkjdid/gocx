@@ -3,11 +3,12 @@ package cmd
 import (
 	"fmt"
 	"github.com/rkjdid/gocx/backtest"
+	"github.com/rkjdid/gocx/backtest/scraper/binance"
 	"github.com/rkjdid/gocx/chart"
 	_db "github.com/rkjdid/gocx/db"
-	"github.com/rkjdid/gocx/scraper/binance"
 	"github.com/rkjdid/gocx/trading"
 	"github.com/rkjdid/gocx/trading/strategy"
+	"github.com/rkjdid/gocx/ts"
 	"github.com/rkjdid/gocx/util"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/plot/vg"
@@ -21,7 +22,7 @@ type NewaveConfig struct {
 	backtest.Source
 	trading.Profile
 
-	TimeframeSlow      backtest.Timeframe
+	TimeframeSlow      ts.Timeframe
 	MACDFast, MACDSlow strategy.MACDOpts
 }
 
@@ -128,7 +129,7 @@ func RunNewaveFor(cfg NewaveConfig, bcur, qcur string) (*NewaveResult, error) {
 	return RunNewave(cfg)
 }
 
-func Newave(source backtest.Source, tf2 backtest.Timeframe,
+func Newave(source backtest.Source, tf2 ts.Timeframe,
 	macdFast, macdSlow strategy.MACDOpts,
 	tp, sl float64) NewaveConfig {
 	return NewaveConfig{

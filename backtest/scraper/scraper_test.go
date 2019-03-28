@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"github.com/rkjdid/gocx/ts"
 	"testing"
 	"time"
 )
@@ -13,8 +14,8 @@ func TestFetchHistorical(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, tf := range []string{TfHour, TfDay} {
-		d, ok := TfToDuration[tf]
+	for _, tf := range []string{ts.TfHour, ts.TfDay} {
+		d, ok := ts.TfToDuration[tf]
 		if !ok {
 			t.Fatal("invalid timeframe")
 		}

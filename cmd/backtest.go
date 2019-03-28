@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/rkjdid/gocx/backtest"
 	_db "github.com/rkjdid/gocx/db"
-	"github.com/rkjdid/gocx/scraper"
+	"github.com/rkjdid/gocx/ts"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"log"
@@ -19,7 +19,7 @@ var (
 	from, to   string
 	tfrom, tto time.Time
 	tf, tf2    string
-	ttf, ttf2  backtest.Timeframe
+	ttf, ttf2  ts.Timeframe
 	tp, sl     float64
 	cfgHash    string
 	source     backtest.Source
@@ -34,17 +34,17 @@ var backtestCmd = TraverseRunHooks(&cobra.Command{
 backtest is used to run again existing results from db.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		var err error
-		ttf, err = backtest.ParseTf(tf)
+		ttf, err = ts.ParseTf(tf)
 		if err != nil {
 			return fmt.Errorf("parsing -tf: %s\n", err)
 		}
 		if tf2 == "" {
-			ttf2 = backtest.Timeframe{
+			ttf2 = ts.Timeframe{
 				Unit: ttf.Unit,
 				N:    ttf.N * 4,
 			}
 		} else {
-			ttf2, err = backtest.ParseTf(tf2)
+			ttf2, err = ts.ParseTf(tf2)
 			if err != nil {
 				return fmt.Errorf("parsing -tf2: %s\n", err)
 			}
@@ -134,7 +134,7 @@ func init() {
 	backtestCmd.PersistentFlags().StringVar(&from, "from", "", "from date: dd-mm-yyyy")
 	backtestCmd.PersistentFlags().StringVarP(&x, "exchange", "x", "binance", "exchange to scrape from")
 	backtestCmd.PersistentFlags().StringVar(&to, "to", "", "to date: dd-mm-yyyy (defaults to time.Now())")
-	backtestCmd.PersistentFlags().StringVar(&tf, "tf", scraper.TfDay, tfFlagHelper())
+	backtestCmd.PersistentFlags().StringVar(&tf, "tf", ts.TfDay, tfFlagHelper())
 	backtestCmd.PersistentFlags().Float64Var(&tp, "tp", 0.1, "take profit")
 	backtestCmd.PersistentFlags().Float64Var(&sl, "sl", 0.025, "stop loss")
 	backtestCmd.PersistentFlags().StringVar(&cfgHash, "cfg", "",
@@ -186,5 +186,5 @@ func rerunNewaveWith(nwr NewaveResult, cfg NewaveConfig) (*NewaveResult, error) 
 }
 
 func tfFlagHelper() string {
-	return fmt.Sprintf("<unit>[<n>] with <n> positive int (default 1) and <unit> in %v", scraper.TfToDuration)
+	return fmt.Sprintf("<unit>[<n>] with <n> positive int (default 1) and <unit> in %v", ts.TfToDuration)
 }

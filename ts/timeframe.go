@@ -1,10 +1,21 @@
-package backtest
+package ts
 
 import (
 	"fmt"
-	"github.com/rkjdid/gocx/scraper"
 	"time"
 )
+
+const (
+	TfMinute = "minute"
+	TfHour   = "hour"
+	TfDay    = "day"
+)
+
+var TfToDuration = map[string]time.Duration{
+	TfMinute: time.Minute,
+	TfHour:   time.Hour,
+	TfDay:    time.Hour * 24,
+}
 
 type Timeframe struct {
 	N    int
@@ -16,12 +27,12 @@ func (tf Timeframe) String() string {
 }
 
 func (tf Timeframe) IsValid() bool {
-	_, ok := scraper.TfToDuration[tf.Unit]
+	_, ok := TfToDuration[tf.Unit]
 	return ok
 }
 
 func (tf Timeframe) ToDuration() time.Duration {
-	v := scraper.TfToDuration[tf.Unit]
+	v := TfToDuration[tf.Unit]
 	return v * time.Duration(tf.N)
 }
 
@@ -43,11 +54,11 @@ func ParseTf(tf string) (Timeframe, error) {
 	}
 	switch ttf.Unit {
 	case "h", "H":
-		ttf.Unit = scraper.TfHour
+		ttf.Unit = TfHour
 	case "m", "M":
-		ttf.Unit = scraper.TfMinute
+		ttf.Unit = TfMinute
 	case "d", "D":
-		ttf.Unit = scraper.TfDay
+		ttf.Unit = TfDay
 	}
 	if !ttf.IsValid() {
 		return ttf, fmt.Errorf("invalid duration unit: %s", ttf.Unit)
@@ -57,11 +68,11 @@ func ParseTf(tf string) (Timeframe, error) {
 
 func DurationToTf(d time.Duration) (tf Timeframe, err error) {
 	for _, unit := range []string{
-		scraper.TfDay,
-		scraper.TfHour,
-		scraper.TfMinute,
+		TfDay,
+		TfHour,
+		TfMinute,
 	} {
-		dunit := scraper.TfToDuration[unit]
+		dunit := TfToDuration[unit]
 		if d >= dunit {
 			if d%dunit != 0 {
 				return tf, fmt.Errorf("not multiple of %s", dunit)

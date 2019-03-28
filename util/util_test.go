@@ -18,10 +18,10 @@ func Test_helpers(t *testing.T) {
 	if MidLinear(2, 10) != 6 {
 		t.Errorf("MidLinear")
 	}
-	if MovOppositeF(1.95, 2) != 2.05 {
+	if MovOppositeF(1.95, 2, 3) != 2.05 {
 		t.Errorf("MovOppositeF")
 	}
-	if MovOppositeF(1, 2) != 3 {
+	if MovOppositeF(0, 1, 4) != 2 {
 		t.Errorf("MovOppositeF")
 	}
 
