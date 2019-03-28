@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/rkjdid/gocx/trading/strategy"
 	"github.com/rkjdid/gocx/util"
 	"github.com/spf13/cobra"
 	"log"
@@ -42,17 +41,21 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 					log.Fatalf("db.ZREVRANGE: %s", err)
 				}
 				for _, key := range keys {
-					t0 := time.Now()
-					log.Printf("optimize %s", key)
-					err = Optimize(key)
-					if err != nil {
-						log.Printf("optimize %s: %s", key, err)
+					if strings.Index(key, NewavePrefix) == 0 {
+						t0 := time.Now()
+						log.Printf("optimize %s", key)
+						err = OptimizeNewave(key)
+						if err != nil {
+							log.Printf("optimize %s: %s", key, err)
+						} else {
+							log.Printf("done %s", time.Since(t0))
+						}
 					} else {
-						log.Printf("done %s", time.Since(t0))
+						log.Fatalf("unsupported hash prefix: %s", key)
 					}
 				}
 			} else if strings.Index(hash, NewavePrefix) == 0 {
-				err := Optimize(hash)
+				err := OptimizeNewave(hash)
 				if err != nil {
 					log.Fatalf("optimize %s: %s", hash, err)
 				}
@@ -69,39 +72,6 @@ func init() {
 	optimizeCmd.PersistentFlags().StringVar(&zkeyOptimized, "zkey2", "optimized", "zkey optimized results")
 	addSaveFlag(optimizeCmd.PersistentFlags())
 	rand.Seed(time.Now().Unix())
-}
-
-func Optimize(hash string) error {
-	var nwr NewaveResult
-	err := db.LoadJSON(hash, &nwr)
-	if err != nil {
-		return fmt.Errorf("couldn't load %s: %s", hash, err)
-	}
-	rank0, _ := db.ZRANK(zkey, hash)
-	log.Printf("initial state: %s", nwr.String())
-	log.Printf("rank %d", rank0)
-
-	sa := saConfig
-	cfg := nwr.Config
-	res, err := sa.Optimize(&NewaveResult{Config: cfg})
-	if res != nil {
-		best := res.(*NewaveResult)
-		hash, _, err := best.Digest()
-		if err != nil {
-			return fmt.Errorf("couldn't digest result: %s", err)
-		}
-		if saveFlag {
-			_, err = db.SaveZScorer(best, zkeyOptimized)
-			if err != nil {
-				log.Println("redis save:", err)
-			}
-		}
-		log.Printf("best: %s", best)
-		fmt.Println(best.Details())
-		rank, _ := db.ZRANK(zkeyOptimized, hash)
-		log.Printf("id: %s, rank %d", hash, rank)
-	}
-	return err
 }
 
 type SimulatedAnnealing struct {
@@ -173,44 +143,36 @@ type AnnealingState interface {
 	Energy() float64
 }
 
-// Newave implementation for AnnealingState
-
-func (nwr *NewaveResult) Move() AnnealingState {
-	next := *nwr
-
-	// todo explore timeframes space also ?
-
-	// risk parameters search space
-	next.Config.StopLoss += util.RandRangeF(-0.01, 0.01)
-	next.Config.TakeProfit += util.RandRangeF(-0.01, 0.01)
-	util.FixRangeLinearF(&next.Config.StopLoss, 0.01, .618)
-	util.FixRangeLinearF(&next.Config.TakeProfit, 0.05, .618)
-
-	// macds parameters search space
-	for _, opts := range []*strategy.MACDOpts{&next.Config.MACDFast, &next.Config.MACDSlow} {
-		opts.Fast += util.RandRange(-1, 1)
-		opts.Slow += util.RandRange(-1, 1)
-		opts.SignalPeriod += util.RandRange(-1, 1)
-		util.FixRangeLinear(&opts.Fast, 2, 21)
-		util.FixRangeLinear(&opts.Slow, 13, 89)
-		util.FixRangeLinear(&opts.SignalPeriod, 2, 34)
-
-		// swap values that crossed for macd.slow/fast
-		if opts.Fast > opts.Slow {
-			opts.Fast, opts.Slow = opts.Slow, opts.Fast
-		}
-	}
-
-	return &next
-}
-
-func (nwr *NewaveResult) Energy() float64 {
-	res, err := nwr.Config.Backtest()
+// OptimizeNewave is the main optimization func for a given NewaveResult hash
+func OptimizeNewave(hash string) error {
+	var nwr NewaveResult
+	err := db.LoadJSON(hash, &nwr)
 	if err != nil {
-		log.Println("nwr.Backtest():", err)
-		return 0
+		return fmt.Errorf("couldn't load %s: %s", hash, err)
 	}
-	*nwr = *res
-	// in annealing sim, the lesser the energy the better
-	return -nwr.ZScore()
+	rank0, _ := db.ZRANK(zkey, hash)
+	log.Printf("initial state: %s", nwr.String())
+	log.Printf("rank %d", rank0)
+
+	sa := saConfig
+	cfg := nwr.Config
+	res, err := sa.Optimize(&NewaveResult{Config: cfg})
+	if res != nil {
+		best := res.(*NewaveResult)
+		hash, _, err := best.Digest()
+		if err != nil {
+			return fmt.Errorf("couldn't digest result: %s", err)
+		}
+		if saveFlag {
+			_, err = db.SaveZScorer(best, zkeyOptimized)
+			if err != nil {
+				log.Println("redis save:", err)
+			}
+		}
+		log.Printf("best: %s", best)
+		fmt.Println(best.Details())
+		rank, _ := db.ZRANK(zkeyOptimized, hash)
+		log.Printf("id: %s, rank %d", hash, rank)
+	}
+	return err
 }

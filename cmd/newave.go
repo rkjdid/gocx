@@ -8,6 +8,7 @@ import (
 	"github.com/rkjdid/gocx/scraper/binance"
 	"github.com/rkjdid/gocx/trading"
 	"github.com/rkjdid/gocx/trading/strategy"
+	"github.com/rkjdid/gocx/util"
 	"github.com/spf13/cobra"
 	"gonum.org/v1/plot/vg"
 	"log"
@@ -22,12 +23,6 @@ type NewaveConfig struct {
 
 	TimeframeSlow      backtest.Timeframe
 	MACDFast, MACDSlow strategy.MACDOpts
-}
-
-type NewaveResult struct {
-	Config NewaveConfig
-	backtest.Result
-	Id string
 }
 
 var (
@@ -236,7 +231,7 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 			signals.WithLabelValues("fast", sig1.Action.String()).Inc()
 		}
 		if sig2 != strategy.NoSignal {
-			signals.WithLabelValues("slow", sig1.Action.String()).Inc()
+			signals.WithLabelValues("slow", sig2.Action.String()).Inc()
 		}
 
 		tt := trigger.Action == strategy.Buy
@@ -277,6 +272,19 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 	return &result, nil
 }
 
+func (n NewaveConfig) String() string {
+	return fmt.Sprintf("macd(%s, %s) & macd(%s, %s) - tp %.1f%% sl %.1f%%",
+		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
+		n.TakeProfit*100, -n.StopLoss*100,
+	)
+}
+
+type NewaveResult struct {
+	Config NewaveConfig
+	backtest.Result
+	Id string
+}
+
 // Digest is db.Digester implementation with json data and a id-hash.
 func (nwr *NewaveResult) Digest() (id string, data []byte, err error) {
 	id, data, err = _db.JSONDigest(
@@ -285,13 +293,6 @@ func (nwr *NewaveResult) Digest() (id string, data []byte, err error) {
 	)
 	nwr.Id = id
 	return
-}
-
-func (n NewaveConfig) String() string {
-	return fmt.Sprintf("macd(%s, %s) & macd(%s, %s) - tp %.1f%% sl %.1f%%",
-		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
-		n.TakeProfit*100, -n.StopLoss*100,
-	)
 }
 
 func (nwr NewaveResult) String() string {
@@ -308,4 +309,46 @@ func (nwr NewaveResult) Details() string {
 	}
 	hash, _, _ := nwr.Digest()
 	return s + fmt.Sprintln(nwr) + fmt.Sprintln("id:", hash)
+}
+
+// SA implementation
+
+func (nwr *NewaveResult) Move() AnnealingState {
+	next := *nwr
+
+	// todo explore timeframes space also ?
+
+	// risk parameters search space
+	next.Config.StopLoss += util.RandRangeF(-0.01, 0.01)
+	next.Config.TakeProfit += util.RandRangeF(-0.01, 0.01)
+	util.FixRangeLinearF(&next.Config.StopLoss, 0.01, .618)
+	util.FixRangeLinearF(&next.Config.TakeProfit, 0.05, .618)
+
+	// macds parameters search space
+	for _, opts := range []*strategy.MACDOpts{&next.Config.MACDFast, &next.Config.MACDSlow} {
+		opts.Fast += util.RandRange(-1, 1)
+		opts.Slow += util.RandRange(-1, 1)
+		opts.SignalPeriod += util.RandRange(-1, 1)
+		util.FixRangeLinear(&opts.Fast, 2, 21)
+		util.FixRangeLinear(&opts.Slow, 13, 89)
+		util.FixRangeLinear(&opts.SignalPeriod, 2, 34)
+
+		// swap values that crossed for macd.slow/fast
+		if opts.Fast > opts.Slow {
+			opts.Fast, opts.Slow = opts.Slow, opts.Fast
+		}
+	}
+
+	return &next
+}
+
+func (nwr *NewaveResult) Energy() float64 {
+	res, err := nwr.Config.Backtest()
+	if err != nil {
+		log.Println("nwr.Backtest():", err)
+		return 0
+	}
+	*nwr = *res
+	// in annealing sim, the lesser the energy the better
+	return -nwr.ZScore()
 }
