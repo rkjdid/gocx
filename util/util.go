@@ -3,6 +3,7 @@ package util
 import (
 	"math"
 	"math/rand"
+	"time"
 )
 
 func MovOpposite(v int, min, max int) int {
@@ -130,4 +131,17 @@ func FixRangeLog2F(v *float64, min, max float64) {
 
 func FixRangeLog2(v *int, min, max int) {
 	FixRangeFn(v, min, max, MidLog2_)
+}
+
+func UnixToTime(q int64) time.Time {
+	if q <= 0 {
+		return time.Time{}
+	}
+	if q > 1e11 {
+		// 1e11 is year 5138, we assume we're dealing with millisecs
+		return time.Unix(q/1000, (q%1000)*1e6)
+	} else {
+		// seconds timestamp
+		return time.Unix(q, 0)
+	}
 }
