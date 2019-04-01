@@ -53,9 +53,9 @@ type Position struct {
 	Transactions []*Transaction
 }
 
-func NewPosition(t time.Time, base, quote string, direction Direction) *Position {
+func NewPosition(base, quote string, direction Direction) *Position {
 	return &Position{
-		Base: base, Quote: quote, Direction: direction, FeesRate: DefaultFees, OpenTime: t,
+		Base: base, Quote: quote, Direction: direction, FeesRate: DefaultFees,
 	}
 }
 
@@ -112,6 +112,9 @@ func (p Position) NetOnClose(pr float64) float64 {
 }
 
 func (p *Position) AddTransaction(t *Transaction) {
+	if len(p.Transactions) == 0 {
+		p.OpenTime = t.Time
+	}
 	p.Transactions = append(p.Transactions, t)
 	if p.Direction == t.Direction {
 		p.AvgEntry = ((p.AvgEntry * p.Total) + (t.Price * t.Quantity)) /

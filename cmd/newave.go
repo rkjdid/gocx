@@ -245,7 +245,7 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 
 			// buy signal -> open position
 			if tt && (pos == nil || pos.State == trading.Closed) {
-				pos = trading.NewPosition(x.Timestamp.T(), n.Base, n.Quote, trading.Long)
+				pos = trading.NewPosition(n.Base, n.Quote, trading.Long)
 				pos.PaperBuyAt(k/x.Close, x.Close, x.Timestamp.T())
 				trades.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				result.Positions = append(result.Positions, pos)
