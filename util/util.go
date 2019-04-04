@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const DefaultTimeFormat = "2006-01-02 15:04 -0700"
+
 func MovOpposite(v int, min, max int) int {
 	return int(MovOppositeF(float64(v), float64(min), float64(max)))
 }

@@ -2,6 +2,9 @@ package trading
 
 import (
 	"fmt"
+	"github.com/rkjdid/gocx/ts"
+	"github.com/rkjdid/gocx/util"
+	"log"
 	"time"
 )
 
@@ -25,11 +28,12 @@ const (
 )
 
 type Transaction struct {
-	Id        int
-	Time      time.Time
-	Direction Direction
-	Quantity  float64
-	Price     float64
+	Id         int
+	Time       time.Time
+	Direction  Direction
+	Quantity   float64
+	Price      float64
+	Commission float64
 }
 
 func (t Transaction) Cost() float64 {
@@ -50,12 +54,15 @@ type Position struct {
 	OpenTime  time.Time
 	CloseTime time.Time
 
+	Broker       Broker
 	Transactions []*Transaction
+
+	tick ts.OHLCV
 }
 
-func NewPosition(base, quote string, direction Direction) *Position {
+func NewPosition(b Broker, base, quote string, direction Direction) *Position {
 	return &Position{
-		Base: base, Quote: quote, Direction: direction, FeesRate: DefaultFees,
+		Broker: b, Base: base, Quote: quote, Direction: direction, FeesRate: DefaultFees,
 	}
 }
 
@@ -66,8 +73,8 @@ func (p Position) String() string {
 	}
 
 	return fmt.Sprintf("  %s @ "+format+" -> %s @ "+format+": %10.2f",
-		p.OpenTime.Format("2006-01-02 15:04 -0700"), p.AvgEntry,
-		p.CloseTime.Format("2006-01-02 15:04 -0700"), p.AvgExit,
+		p.OpenTime.Format(util.DefaultTimeFormat), p.AvgEntry,
+		p.CloseTime.Format(util.DefaultTimeFormat), p.AvgExit,
 		p.Net())
 }
 
@@ -92,7 +99,6 @@ func (p Position) Net() float64 {
 	}
 }
 
-//todo think & test these things, diff between Net & NetRatio, etc.
 func (p Position) NetRatio() float64 {
 	if p.AvgEntry == 0 || p.AvgExit == 0 {
 		return 0
@@ -105,69 +111,84 @@ func (p Position) NetRatio() float64 {
 	}
 }
 
-// NetOnClose will PaperClose and return Net on a copy of p, caller Position is unchanged.
-func (p Position) NetOnClose(pr float64) float64 {
-	p.PaperClose(pr)
-	return p.Net()
-}
-
-func (p *Position) AddTransaction(t *Transaction) {
-	if len(p.Transactions) == 0 {
-		p.OpenTime = t.Time
+func (p *Position) AddTransactions(ts ...*Transaction) {
+	if len(ts) == 0 {
+		return
 	}
-	p.Transactions = append(p.Transactions, t)
-	if p.Direction == t.Direction {
-		p.AvgEntry = ((p.AvgEntry * p.Total) + (t.Price * t.Quantity)) /
-			(p.Total + t.Quantity)
-		p.Total += t.Quantity
-		p.State = Active
-	} else {
-		p.AvgExit = ((p.AvgExit * p.Traded) + (t.Price * t.Quantity)) /
-			(p.Traded + t.Quantity)
-		p.Traded += t.Quantity
-		if p.Traded >= p.Total {
-			p.State = Closed
-			p.CloseTime = t.Time
+	if len(p.Transactions) == 0 {
+		p.OpenTime = ts[0].Time
+	}
+	for _, t := range ts {
+		p.TotalFees += t.Commission
+		p.Transactions = append(p.Transactions, t)
+		if p.Direction == t.Direction {
+			p.AvgEntry = ((p.AvgEntry * p.Total) + (t.Price * t.Quantity)) /
+				(p.Total + t.Quantity)
+			p.Total += t.Quantity
+			p.State = Active
+		} else {
+			p.AvgExit = ((p.AvgExit * p.Traded) + (t.Price * t.Quantity)) /
+				(p.Traded + t.Quantity)
+			p.Traded += t.Quantity
+			if p.Traded >= p.Total {
+				p.State = Closed
+				p.CloseTime = t.Time
+			}
 		}
 	}
 }
 
-func (p *Position) PaperBuy(q, pr float64) {
-	p.PaperBuyAt(q, pr, time.Now())
-}
-
-func (p *Position) PaperBuyAt(q, pr float64, t time.Time) {
-	p.TotalFees += p.FeesRate * (q * pr)
-	p.AddTransaction(&Transaction{
-		Direction: Buy,
-		Quantity:  q,
-		Price:     pr,
-		Time:      t,
-	})
-}
-
-func (p *Position) PaperSell(q, pr float64) {
-	p.PaperSellAt(q, pr, time.Now())
-}
-
-func (p *Position) PaperSellAt(q, pr float64, t time.Time) {
-	p.TotalFees += p.FeesRate * (q * pr)
-	p.AddTransaction(&Transaction{
-		Direction: Sell,
-		Quantity:  q,
-		Price:     pr,
-		Time:      t,
-	})
-}
-
-func (p *Position) PaperClose(pr float64) {
-	p.PaperCloseAt(pr, time.Now())
-}
-
-func (p *Position) PaperCloseAt(pr float64, t time.Time) {
-	fn := p.PaperBuyAt
-	if p.Direction == Long {
-		fn = p.PaperSellAt
+func (p *Position) SetTick(o ts.OHLCV) {
+	p.tick = o
+	if pb, ok := p.Broker.(*PaperTrading); ok {
+		pb.Update(o)
 	}
-	fn(p.Total-p.Traded, pr, t)
+}
+
+func (p *Position) marketOrder(fn func(string, float64) ([]*Transaction, error), q float64, direction string) error {
+	var ts []*Transaction
+	var err error
+	for i := 0; i < 3; i++ {
+		ts, err = fn(p.Broker.Symbol(p.Base, p.Quote), q)
+		if err != nil {
+			log.Printf("marketOrder.%s: %s", direction, err)
+			time.Sleep(time.Second * 2)
+			continue
+		}
+	}
+	if err != nil {
+		return err
+	}
+	p.AddTransactions(ts...)
+	return nil
+}
+
+func (p *Position) MarketBuy(q float64) error {
+	return p.marketOrder(p.Broker.MarketBuy, q, "Buy")
+}
+
+func (p *Position) MarketSell(q float64) error {
+	return p.marketOrder(p.Broker.MarketSell, q, "Sell")
+}
+
+func (p *Position) Close() error {
+	fn := p.MarketBuy
+	if p.Direction == Long {
+		fn = p.MarketSell
+	}
+	return fn(p.Total - p.Traded)
+}
+
+// NetOnClose will PaperClose and return Net on a copy of p, caller Position is unchanged.
+func (p Position) NetOnClose() float64 {
+	if _, ok := p.Broker.(*PaperTrading); !ok {
+		pt := &PaperTrading{
+			FeesRate: p.FeesRate,
+		}
+		pt.Update(p.tick)
+		p.Broker = pt
+	}
+	// PaperTrading broker does not error
+	_ = p.Close()
+	return p.Net()
 }

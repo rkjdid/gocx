@@ -7,20 +7,28 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rkjdid/gocx/backtest/scraper"
 	_db "github.com/rkjdid/gocx/db"
+	"github.com/rkjdid/gocx/trading"
+	"github.com/rkjdid/gocx/trading/brokers"
 	"github.com/spf13/cobra"
 	"log"
 	"net/http"
 )
 
 var (
+	db     *_db.RedisDriver
+	broker trading.Broker
+
 	debug      bool
-	db         *_db.RedisDriver
 	redisAddr  string
 	promBind   string
 	promHandle string
 	promServer bool
 	n          int
 	zkey       string
+	accName    string
+	brokerName string
+	apiKey     string
+	apiSec     string
 
 	rootCmd = &cobra.Command{
 		Use:   "gocx",
@@ -30,10 +38,6 @@ var (
 			scraper.Debug = debug
 
 			// init db connection
-			//redisConn, err := redis.Dial("tcp", redisAddr)
-			//if err != nil {
-			//	log.Fatalln("redis dial:", err)
-			//}
 			p, err := pool.New("tcp", redisAddr, 12)
 			if err != nil {
 				log.Fatalln("redis pool:", err)
@@ -48,6 +52,18 @@ var (
 				go func() {
 					log.Fatal("http listen:", http.ListenAndServe(promBind, nil))
 				}()
+			}
+
+			// init broker
+			switch brokerName {
+			case "binance":
+				b := brokers.NewBinanceBroker(accName, apiKey, apiSec)
+				b.Account = accName
+				broker = b
+			default:
+				broker = &trading.PaperTrading{
+					FeesRate: trading.DefaultFees,
+				}
 			}
 		},
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {
@@ -81,8 +97,12 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&promHandle, "prometheus-handle", "/prometheus", "prometheus handle")
 	rootCmd.PersistentFlags().BoolVar(&promServer, "prometheus-server", false, "enable prometheus webserver")
 	rootCmd.PersistentFlags().StringVar(&zkey, "zkey", "backtest", "redis key for sorted set")
+	rootCmd.PersistentFlags().StringVar(&brokerName, "broker", "paper", "broker name, one of [binance, paper]")
+	rootCmd.PersistentFlags().StringVar(&accName, "accountName", "", "account name, used for labels and db storing")
+	rootCmd.PersistentFlags().StringVar(&apiKey, "apiKey", "", "api key")
+	rootCmd.PersistentFlags().StringVar(&apiSec, "apiSec", "", "api secret")
 
-	rootCmd.AddCommand(backtestCmd, topCmd, showCmd, optimizeCmd)
+	rootCmd.AddCommand(backtestCmd, topCmd, showCmd, optimizeCmd, snapshotCmd)
 	rootCmd.AddCommand(&cobra.Command{
 		Use: "flushdb",
 		Run: func(cmd *cobra.Command, args []string) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/rkjdid/gocx/backtest"
 	_db "github.com/rkjdid/gocx/db"
+	"github.com/rkjdid/gocx/trading"
 	"github.com/rkjdid/gocx/ts"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -71,6 +72,7 @@ backtest is used to run again existing results from db.`,
 			To:        tto,
 			Timeframe: ttf,
 		}
+		forcePaperBroker()
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -125,6 +127,15 @@ backtest is used to run again existing results from db.`,
 
 func addSaveFlag(set *pflag.FlagSet) {
 	set.BoolVar(&saveFlag, "save", false, "save results to redis")
+}
+
+func forcePaperBroker() {
+	if _, ok := broker.(*trading.PaperTrading); !ok {
+		log.Println("forcing PaperTrading broker")
+		broker = &trading.PaperTrading{
+			FeesRate: trading.DefaultFees,
+		}
+	}
 }
 
 func init() {

@@ -193,17 +193,21 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 	j := 0
 	var sig1, sig2, last strategy.Signal
 	for _, x := range histFast.Data {
-		// are we closing ?
+		// set price & time on paper
+		if pos != nil {
+			pos.SetTick(x)
+		}
+		// manage position
 		if pos != nil && pos.Active() {
-			potentialNet := pos.NetOnClose(x.Close)
+			potentialNet := pos.NetOnClose()
 
 			// take profit reached
 			if potentialNet > 0 && potentialNet > n.TakeProfit*pos.Cost() {
-				pos.PaperCloseAt(x.Close, x.Timestamp.T())
+				_ = pos.Close()
 			}
 			// stop loss reached
 			if potentialNet < 0 && potentialNet < -n.StopLoss*pos.Cost() {
-				pos.PaperCloseAt(x.Close, x.Timestamp.T())
+				_ = pos.Close()
 			}
 
 			if pos.State == trading.Closed {
@@ -245,8 +249,8 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 
 			// buy signal -> open position
 			if tt && (pos == nil || pos.State == trading.Closed) {
-				pos = trading.NewPosition(n.Base, n.Quote, trading.Long)
-				pos.PaperBuyAt(k/x.Close, x.Close, x.Timestamp.T())
+				pos = trading.NewPosition(broker, n.Base, n.Quote, trading.Long)
+				_ = pos.MarketBuy(k / x.Close)
 				trades.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				result.Positions = append(result.Positions, pos)
 			}

@@ -30,22 +30,29 @@ func TestPosition_Net(t *testing.T) {
 }
 
 func TestPosition_AddTransaction(t *testing.T) {
+	broker := &PaperTrading{
+		FeesRate: DefaultFees,
+	}
 	p := Position{
 		Direction: Long,
 		State:     Active,
 		FeesRate:  DefaultFees,
+		Broker:    broker,
 	}
 
-	p.PaperBuy(1, 4)
+	broker.Price = 4
+	_ = p.MarketBuy(1)
 	if p.AvgEntry != 4 {
 		t.Errorf("p.AvgEntry != 4")
 	}
-	p.PaperBuy(1, 2)
+	broker.Price = 2
+	_ = p.MarketBuy(1)
 	if p.AvgEntry != 3 {
 		t.Errorf("p.AvgEntry != 3")
 	}
 
-	p.PaperSell(1, 10)
+	broker.Price = 10
+	_ = p.MarketSell(1)
 	if p.AvgExit != 10 {
 		t.Errorf("p.AvgEntry != 3")
 	}
@@ -56,7 +63,8 @@ func TestPosition_AddTransaction(t *testing.T) {
 		t.Errorf("position should've traded 1")
 	}
 
-	p.PaperBuy(2, 5)
+	broker.Price = 5
+	_ = p.MarketBuy(2)
 	if p.AvgEntry != 4 {
 		t.Errorf("p.AvgEntry != 4")
 	}
@@ -64,7 +72,8 @@ func TestPosition_AddTransaction(t *testing.T) {
 		t.Errorf("p.Total != 4")
 	}
 
-	p.PaperSell(3, 10)
+	broker.Price = 10
+	_ = p.MarketSell(3)
 	if p.State != Closed {
 		t.Errorf("position should be closed")
 	}
@@ -74,10 +83,4 @@ func TestPosition_AddTransaction(t *testing.T) {
 	if p.Net() != 6*4-(4*p.AvgEntry*p.FeesRate+4*p.AvgExit*p.FeesRate) {
 		t.Errorf("unexpected net worth, got %f", p.Net())
 	}
-}
-
-func TestPosition_PaperClose(t *testing.T) {
-	p := Position{Direction: Long}
-	p.PaperBuy(10, 10)
-	p.PaperClose(10)
 }

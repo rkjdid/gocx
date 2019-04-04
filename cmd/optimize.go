@@ -20,7 +20,7 @@ var (
 
 	zkeyOptimized string
 
-	optimizeCmd = &cobra.Command{
+	optimizeCmd = TraverseRunHooks(&cobra.Command{
 		Use:   "optimize",
 		Short: "Optimize a strategy",
 		Long: `Usage: optimize <hash>
@@ -28,6 +28,9 @@ var (
 Loads hash result from a previous backtest, and optimize from
 there. It can run for a while depending on optimizer config and strat.Backtest..`,
 		Args: cobra.MaximumNArgs(1),
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			forcePaperBroker()
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			var hash string
 			if len(args) == 0 {
@@ -63,7 +66,7 @@ there. It can run for a while depending on optimizer config and strat.Backtest..
 				log.Fatalf("unsupported hash prefix: %s", hash)
 			}
 		},
-	}
+	})
 )
 
 func init() {
