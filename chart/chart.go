@@ -141,7 +141,7 @@ func AddSignalWithStyle(t time.Time, style draw.GlyphStyle, y float64) {
 	signals = append(signals, s)
 }
 
-func Save(dimX, dimY vg.Length, yGrid bool, file string) error {
+func Save(dimX, dimY float64, yGrid bool, file string) error {
 	if yGrid {
 		for _, v := range p.Y.Tick.Marker.Ticks(p.Y.Min, p.Y.Max) {
 			l := plotter.DefaultLineStyle
@@ -159,5 +159,5 @@ func Save(dimX, dimY vg.Length, yGrid bool, file string) error {
 	for _, s := range signals {
 		p.Add(s)
 	}
-	return p.Save(dimX, dimY, file)
+	return p.Save(vg.Length(dimX), vg.Length(dimY), file)
 }

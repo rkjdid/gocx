@@ -11,7 +11,6 @@ import (
 	"github.com/rkjdid/gocx/ts"
 	"github.com/rkjdid/gocx/util"
 	"github.com/spf13/cobra"
-	"gonum.org/v1/plot/vg"
 	"log"
 	"math"
 )
@@ -264,7 +263,7 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 		chart.NextLineTheme()
 		_ = macdSlow.Draw()
 		cname := fmt.Sprintf("img/newave_%s%s.png", n.Base, n.Quote)
-		width := vg.Length(math.Max(float64(len(histFast.Data)), 1200))
+		width := math.Max(float64(len(histFast.Data)), 1200)
 		height := width / 1.77
 
 		err = chart.Save(width, height, false, cname)
