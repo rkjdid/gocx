@@ -102,7 +102,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&apiKey, "apiKey", "", "api key")
 	rootCmd.PersistentFlags().StringVar(&apiSec, "apiSec", "", "api secret")
 
-	rootCmd.AddCommand(backtestCmd, topCmd, showCmd, optimizeCmd, snapshotCmd)
+	rootCmd.AddCommand(backtestCmd, topCmd, showCmd, optimizeCmd, snapshotCmd, chartCmd)
 	rootCmd.AddCommand(&cobra.Command{
 		Use: "flushdb",
 		Run: func(cmd *cobra.Command, args []string) {
