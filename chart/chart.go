@@ -8,6 +8,7 @@ import (
 	"gonum.org/v1/plot/plotter"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/vg/draw"
+	"math"
 	"time"
 )
 
@@ -42,7 +43,10 @@ func SetTitles(t, x, y string) {
 }
 
 func SetRanges(minX, maxX, minY, maxY float64) {
-	p.X.Min, p.X.Max, p.Y.Min, p.Y.Max = minX, maxX, minY, maxY
+	p.X.Min = math.Min(p.X.Min, minX)
+	p.X.Max = math.Max(p.X.Max, maxX)
+	p.Y.Min = math.Min(p.Y.Min, minY)
+	p.Y.Max = math.Max(p.Y.Max, maxY)
 }
 
 func AddOHLCVs(data ts.OHLCVs) {
