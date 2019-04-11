@@ -57,7 +57,7 @@ func (o OHLCVs) X0() float64 {
 }
 
 func (o OHLCVs) X0T() time.Time {
-	return time.Time(time.Time(o[0].Timestamp))
+	return o[0].Timestamp.T()
 }
 
 func (o OHLCVs) XN() float64 {
@@ -68,7 +68,7 @@ func (o OHLCVs) XN() float64 {
 }
 
 func (o OHLCVs) XNT() time.Time {
-	return time.Time(time.Time(o[len(o)-1].Timestamp))
+	return o[len(o)-1].Timestamp.T()
 }
 
 func (o OHLCVs) Y0() float64 {
