@@ -18,6 +18,10 @@ type ZScorer interface {
 	ZScore() float64
 }
 
+type Saver interface {
+	Save(db *RedisDriver) (string, error)
+}
+
 func JSONDigest(prefix string, v interface{}) (hash string, data []byte, err error) {
 	var b bytes.Buffer
 	err = json.NewEncoder(&b).Encode(v)

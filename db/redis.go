@@ -17,6 +17,9 @@ func (d *RedisDriver) LoadJSON(id string, v interface{}) error {
 }
 
 func (d *RedisDriver) Save(v Digester) (id string, err error) {
+	if s, ok := v.(Saver); ok {
+		return s.Save(d)
+	}
 	id, data, err := v.Digest()
 	if err != nil {
 		return id, err
