@@ -48,8 +48,9 @@ func TestDurationToTf(t *testing.T) {
 	tf, err = DurationToTf(time.Hour * 48)
 	if err != nil {
 		t.Errorf("2 day duration should be valid")
-	}
-	if tf.Unit != TfDay || tf.N != 2 {
-		t.Errorf("unexpected value for 48h")
+	} else {
+		if tf.Unit != TfDay || tf.N != 2 {
+			t.Errorf("unexpected value for 48h")
+		}
 	}
 }

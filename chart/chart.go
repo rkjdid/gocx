@@ -112,7 +112,6 @@ func AddVertical(f float64, label string) {
 func AddSignal(t time.Time, buy bool, strong bool, y float64) {
 	var style draw.GlyphStyle
 	if buy {
-		y = -y
 		if strong {
 			style = StrongBuy
 		} else {

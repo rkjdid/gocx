@@ -4,20 +4,22 @@ import (
 	"fmt"
 	"github.com/markcheno/go-talib"
 	"github.com/rkjdid/gocx/chart"
+	"github.com/rkjdid/gocx/trading"
 	"github.com/rkjdid/gocx/ts"
 	"time"
 )
 
 type MACDOpts struct {
 	Fast, Slow, SignalPeriod int
+	Timeframe                ts.Timeframe
 }
 
 func (opts MACDOpts) NewMACD() *MACD {
-	return NewMACD(opts.Fast, opts.Slow, opts.SignalPeriod)
+	return NewMACD(opts.Fast, opts.Slow, opts.SignalPeriod, opts.Timeframe)
 }
 
 func (opts MACDOpts) NewMACDCross() *MACDCross {
-	return NewMACDCross(opts.Fast, opts.Slow, opts.SignalPeriod)
+	return NewMACDCross(opts.Fast, opts.Slow, opts.SignalPeriod, opts.Timeframe)
 }
 
 func (opts MACDOpts) String() string {
@@ -26,27 +28,26 @@ func (opts MACDOpts) String() string {
 
 type MACD struct {
 	MACDOpts
-	Data       ts.OHLCVs
-	LastSignal Signal
-
+	Data                        ts.OHLCVs
 	LastOHLCV                   ts.OHLCV
 	OutMACD, OutSignal, OutHist []float64
 }
 
-func NewMACD(f, s, signalPeriod int) *MACD {
+func NewMACD(f, s, signalPeriod int, tf ts.Timeframe) *MACD {
 	return &MACD{
 		MACDOpts: MACDOpts{
 			Fast:         f,
 			Slow:         s,
 			SignalPeriod: signalPeriod,
+			Timeframe:    tf,
 		},
 		Data: make(ts.OHLCVs, 0, s),
 	}
 }
 
-func (m *MACD) AddTick(ohlcv ts.OHLCV) {
-	m.LastOHLCV = ohlcv
-	m.Data = append(m.Data, ohlcv)
+func (m *MACD) AddTick(x trading.Tick) {
+	m.LastOHLCV = x.OHLCV
+	m.Data = append(m.Data, x.OHLCV)
 	if len(m.Data) <= m.Slow {
 		return
 		// this value of 5*m.Slow was chosen because it
@@ -80,22 +81,21 @@ func (m *MACD) Draw() error {
 
 type MACDCross struct {
 	*MACD
+	LastSignal Signal
 }
 
-func NewMACDCross(f, s, signal int) *MACDCross {
+func NewMACDCross(f, s, signal int, tf ts.Timeframe) *MACDCross {
 	mc := MACDCross{
-		NewMACD(f, s, signal),
+		NewMACD(f, s, signal, tf),
+		NoSignal,
 	}
 	return &mc
 }
 
-func (m *MACDCross) AddTick(ohlcv ts.OHLCV) {
-	m.MACD.AddTick(ohlcv)
-}
-
-func (m *MACDCross) Signal() Signal {
+func (m *MACDCross) AddTick(t trading.Tick) {
+	m.MACD.AddTick(t)
 	if len(m.OutHist) < 2 {
-		return NoSignal
+		return
 	}
 	x0, x := m.OutHist[len(m.OutHist)-2], m.OutHist[len(m.OutHist)-1]
 	if x0 > 0 && x < 0 {
@@ -104,14 +104,15 @@ func (m *MACDCross) Signal() Signal {
 			Time:     time.Time(m.LastOHLCV.Timestamp),
 			Strength: 1,
 		}
-		return m.LastSignal
 	} else if x0 < 0 && x > 0 {
 		m.LastSignal = Signal{
 			Action:   Buy,
 			Time:     time.Time(m.LastOHLCV.Timestamp),
 			Strength: 1,
 		}
-		return m.LastSignal
 	}
-	return NoSignal
+}
+
+func (m *MACDCross) Signal() Signal {
+	return m.LastSignal
 }

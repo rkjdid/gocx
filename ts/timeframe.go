@@ -36,6 +36,22 @@ func (tf Timeframe) ToDuration() time.Duration {
 	return v * time.Duration(tf.N)
 }
 
+func (tf Timeframe) Diff(tf2 Timeframe) time.Duration {
+	return tf.ToDuration() - tf2.ToDuration()
+}
+
+func (tf Timeframe) Equals(tf2 Timeframe) bool {
+	return tf.N == tf2.N && tf.Unit == tf2.Unit
+}
+
+func (tf Timeframe) Gt(tf2 Timeframe) bool {
+	return tf.Diff(tf2) > 0
+}
+
+func (tf Timeframe) Lt(tf2 Timeframe) bool {
+	return tf.Diff(tf2) < 0
+}
+
 func ParseTf(tf string) (Timeframe, error) {
 	ttf := Timeframe{
 		N: 1, // default

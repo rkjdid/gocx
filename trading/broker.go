@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-
-
 type Broker interface {
 	MarketBuy(sym string, q float64) ([]*Transaction, error)
 	MarketSell(sym string, q float64) ([]*Transaction, error)

@@ -2,13 +2,13 @@ package strategy
 
 import (
 	"fmt"
-	"github.com/rkjdid/gocx/ts"
+	"github.com/rkjdid/gocx/trading"
 	"github.com/rkjdid/util"
 	"time"
 )
 
 type Strategy interface {
-	AddTick(ts.OHLCV)
+	AddTick(trading.Tick)
 	Signal() Signal
 }
 

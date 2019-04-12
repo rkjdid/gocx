@@ -20,13 +20,11 @@ const NewavePrefix = "newave"
 type NewaveConfig struct {
 	backtest.Source
 	trading.Profile
-
-	TimeframeSlow      ts.Timeframe
-	MACDFast, MACDSlow strategy.MACDOpts
+	strategy.NewaveOpts
 }
 
 var (
-	defaultMACD = strategy.MACDOpts{12, 26, 9}
+	defaultMACD = strategy.MACDOpts{12, 26, 9, ts.Timeframe{}}
 
 	newaveCmd = TraverseRunHooks(&cobra.Command{
 		Use:   "newave",
@@ -45,7 +43,11 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			newaveBaseCfg := Newave(source, ttf2, defaultMACD, defaultMACD, tp, sl)
+			macdSlow := defaultMACD
+			macdSlow.Timeframe = ttf
+			macdFast := defaultMACD
+			macdFast.Timeframe = ttf2
+			newaveBaseCfg := Newave(source, macdSlow, macdFast, tp, sl)
 			if cfgHash != "" {
 				var res NewaveResult
 				err := db.LoadJSON(cfgHash, &res)
@@ -56,10 +58,10 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 
 				// overwrite conf values with flag value, if explicitly set
 				if cmd.Flags().Changed("tf") {
-					newaveBaseCfg.Timeframe = ttf
+					newaveBaseCfg.Fast.Timeframe = ttf
 				}
 				if cmd.Flags().Changed("tf2") {
-					newaveBaseCfg.TimeframeSlow = ttf2
+					newaveBaseCfg.Slow.Timeframe = ttf2
 				}
 				if cmd.Flags().Changed("x") {
 					newaveBaseCfg.Exchange = x
@@ -89,7 +91,6 @@ Usually MACD1 & MACD2 config are the same but they can differ..`,
 
 func init() {
 	newaveCmd.Flags().StringVar(&tf2, "tf2", "", tfFlagHelper())
-	// todo add macdFast, macdSlow flags
 }
 
 func NewaveTop(cfg NewaveConfig, n int) {
@@ -128,7 +129,7 @@ func RunNewaveFor(cfg NewaveConfig, bcur, qcur string) (*NewaveResult, error) {
 	return RunNewave(cfg)
 }
 
-func Newave(source backtest.Source, tf2 ts.Timeframe,
+func Newave(source backtest.Source,
 	macdFast, macdSlow strategy.MACDOpts,
 	tp, sl float64) NewaveConfig {
 	return NewaveConfig{
@@ -137,32 +138,34 @@ func Newave(source backtest.Source, tf2 ts.Timeframe,
 			TakeProfit: tp,
 			StopLoss:   sl,
 		},
-		TimeframeSlow: tf2,
-		MACDFast:      macdFast,
-		MACDSlow:      macdSlow,
+		NewaveOpts: strategy.NewaveOpts{
+			Slow: macdSlow,
+			Fast: macdFast,
+		},
 	}
 }
 
 func (n NewaveConfig) Backtest() (*NewaveResult, error) {
-	if !n.Timeframe.IsValid() {
-		return nil, fmt.Errorf("invalid tf: %s", n.Timeframe)
+	if !n.Fast.Timeframe.IsValid() {
+		return nil, fmt.Errorf("invalid tf: %s", n.Fast.Timeframe)
 	}
-	if !n.TimeframeSlow.IsValid() {
-		return nil, fmt.Errorf("invalid tf2: %s", n.TimeframeSlow)
+	if !n.Slow.Timeframe.IsValid() {
+		return nil, fmt.Errorf("invalid tf2: %s", n.Slow.Timeframe)
 	}
 
-	histFast, err := backtest.LoadHistorical(db, n.Exchange, n.Base, n.Quote, n.Timeframe, n.From, n.To)
+	histFast, err := backtest.LoadHistorical(db, n.Exchange, n.Base, n.Quote, n.Fast.Timeframe, n.From, n.To)
 	if err != nil {
 		return nil, err
 	}
-	histSlow, err := backtest.LoadHistorical(db, n.Exchange, n.Base, n.Quote, n.TimeframeSlow, n.From, n.To)
+	histSlow, err := backtest.LoadHistorical(db, n.Exchange, n.Base, n.Quote, n.Slow.Timeframe, n.From, n.To)
 	if err != nil {
 		return nil, err
 	}
 
-	// set actual n.From after LoadHistorical
-	n.From = histFast.From
-	n.To = histFast.To
+	// init DataSource
+	source := backtest.NewHistoricalPair(histFast, histSlow)
+	// set actual bondaries after LoadHistorical
+	n.From, n.To = source.Bondaries()
 
 	// init chart
 	if chartFlag {
@@ -170,14 +173,10 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 		chart.AddOHLCVs(histSlow.Data)
 	}
 
-	// init & feed strategy
-	macdFast := n.MACDFast.NewMACDCross()
-	macdSlow := n.MACDSlow.NewMACDCross()
-	if histFast.Timeframe.ToDuration() > histSlow.Timeframe.ToDuration() {
-		histFast, histSlow = histSlow, histFast
-		macdFast, macdSlow = macdSlow, macdFast
-	}
+	// init strategy
+	newaveStrat := n.NewNewave()
 
+	// init capital & resulty
 	var k0 = 1.0
 	var k = k0
 	var result = NewaveResult{
@@ -188,13 +187,12 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 		},
 	}
 	var pos *trading.Position
+	var last strategy.Signal
 
-	j := 0
-	var sig1, sig2, last strategy.Signal
-	for _, x := range histFast.Data {
+	for x := range source.Feed() {
 		// set price & time on paper
 		if pos != nil {
-			pos.SetTick(x)
+			pos.SetTick(x.OHLCV)
 		}
 		// manage position
 		if pos != nil && pos.Active() {
@@ -210,58 +208,47 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 			}
 
 			if pos.State == trading.Closed {
-				trades.WithLabelValues("sell", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
 				k += pos.Net()
+				if chartFlag {
+					chart.AddSignal(x.Timestamp.T(), false, true, x.Close)
+				}
 			}
 		}
 
-		macdFast.AddTick(x)
-		sig1 = macdFast.Signal()
-		if len(histSlow.Data) > j+1 && x.Timestamp.T().After(histSlow.Data[j+1].Timestamp.T()) {
-			j += 1
-			macdSlow.AddTick(histSlow.Data[j])
-			sig2 = macdSlow.Signal()
-		}
+		// feed strat
+		newaveStrat.AddTick(x)
 
-		var trigger strategy.Signal
-		if sig1 != strategy.NoSignal && macdSlow.LastSignal.Action == sig1.Action {
-			trigger = sig1
-		} else if sig2 != strategy.NoSignal && macdFast.LastSignal.Action == sig2.Action {
-			trigger = sig2
-		}
+		// signal changed
+		if s := newaveStrat.Signal(); s.Action != last.Action {
+			last = s
 
-		// print signals individually
-		if sig1 != strategy.NoSignal {
-			signals.WithLabelValues("fast", sig1.Action.String()).Inc()
-		}
-		if sig2 != strategy.NoSignal {
-			signals.WithLabelValues("slow", sig2.Action.String()).Inc()
-		}
+			if last.Action != strategy.None {
+				if pos != nil && pos.State != trading.Closed {
+					continue
+				}
 
-		tt := trigger.Action == strategy.Buy
-		if trigger != strategy.NoSignal && trigger.Action != last.Action {
-			if chartFlag {
-				chart.AddSignal(trigger.Time, tt, true, 0)
-			}
-			signals.WithLabelValues("newave", trigger.Action.String()).Inc()
-			last = trigger
+				// buy signal -> open long
+				if last.Action == strategy.Buy {
+					pos = trading.NewPosition(broker, n.Base, n.Quote, trading.Long)
+					pos.SetTick(x.OHLCV)
+					_ = pos.MarketBuy(k / x.Close)
+					result.Positions = append(result.Positions, pos)
 
-			// buy signal -> open position
-			if tt && (pos == nil || pos.State == trading.Closed) {
-				pos = trading.NewPosition(broker, n.Base, n.Quote, trading.Long)
-				_ = pos.MarketBuy(k / x.Close)
-				trades.WithLabelValues("buy", fmt.Sprint(pos.Total), fmt.Sprint(x.Close))
-				result.Positions = append(result.Positions, pos)
+					if chartFlag {
+						chart.AddSignal(x.Timestamp.T(), true, true, x.Close)
+					}
+				}
 			}
 		}
 	}
+
 	result.UpdateScore()
 
 	// draw chart
 	if chartFlag {
-		_ = macdFast.Draw()
+		_ = newaveStrat.Fast.Draw()
 		chart.NextLineTheme()
-		_ = macdSlow.Draw()
+		_ = newaveStrat.Slow.Draw()
 		cname := fmt.Sprintf("img/newave_%s%s.png", n.Base, n.Quote)
 		width := math.Max(float64(len(histFast.Data)), 1200)
 		height := width / 1.77
@@ -278,7 +265,7 @@ func (n NewaveConfig) Backtest() (*NewaveResult, error) {
 
 func (n NewaveConfig) String() string {
 	return fmt.Sprintf("macd(%s, %s) & macd(%s, %s) - tp %.1f%% sl %.1f%%",
-		n.Timeframe, n.MACDFast, n.TimeframeSlow, n.MACDSlow,
+		n.Fast.Timeframe, n.Fast, n.Slow.Timeframe, n.Slow,
 		n.TakeProfit*100, -n.StopLoss*100,
 	)
 }
@@ -329,7 +316,7 @@ func (nwr *NewaveResult) Move() AnnealingState {
 	util.FixRangeLinearF(&next.Config.TakeProfit, 0.05, .618)
 
 	// macds parameters search space
-	for _, opts := range []*strategy.MACDOpts{&next.Config.MACDFast, &next.Config.MACDSlow} {
+	for _, opts := range []*strategy.MACDOpts{&next.Config.Fast, &next.Config.Slow} {
 		opts.Fast += util.RandRange(-1, 1)
 		opts.Slow += util.RandRange(-1, 1)
 		opts.SignalPeriod += util.RandRange(-1, 1)

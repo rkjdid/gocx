@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/rkjdid/gocx/backtest/scraper"
 	"github.com/rkjdid/gocx/db"
+	"github.com/rkjdid/gocx/trading"
 	"github.com/rkjdid/gocx/ts"
 	"time"
 )
@@ -23,6 +24,22 @@ func (s Source) String() string {
 type Historical struct {
 	Source
 	Data ts.OHLCVs
+}
+
+func (h Historical) Feed() <-chan trading.Tick {
+	ch := make(chan trading.Tick)
+	go func() {
+		for _, ohlcv := range h.Data {
+			ch <- trading.Tick{
+				Timeframe: h.Timeframe, OHLCV: ohlcv,
+			}
+		}
+	}()
+	return ch
+}
+
+func (h Historical) Bondaries() (from, to time.Time) {
+	return h.From, h.To
 }
 
 func LoadHistorical(db *db.RedisDriver, x, bcur, qcur string, tf ts.Timeframe, from, to time.Time) (*Historical, error) {
@@ -100,4 +117,50 @@ func (h Historical) String() string {
 	return fmt.Sprintf("%s%s%s - tf:%s %6d elements from %s to %s",
 		hi, h.Base, h.Quote, h.Timeframe, h.Data.Len(),
 		h.From.Format(tformatH), h.To.Format(tformatH))
+}
+
+type HistoricalPair struct {
+	Fast, Slow *Historical
+}
+
+func NewHistoricalPair(h1, h2 *Historical) *HistoricalPair {
+	fast, slow := h1, h2
+	if h1.Timeframe.ToDuration() > h2.Timeframe.ToDuration() {
+		fast, slow = slow, fast
+	}
+	return &HistoricalPair{fast, slow}
+}
+
+func (h HistoricalPair) Feed() <-chan trading.Tick {
+	ch := make(chan trading.Tick)
+	go func() {
+		j := 0
+		var nextSlow *ts.OHLCV
+		if len(h.Slow.Data) > 0 {
+			nextSlow = &h.Slow.Data[0]
+		}
+		for _, fast := range h.Fast.Data {
+			ch <- trading.Tick{
+				Timeframe: h.Fast.Timeframe, OHLCV: fast,
+			}
+
+			if nextSlow != nil && fast.Timestamp.T().After(nextSlow.Timestamp.T()) {
+				ch <- trading.Tick{
+					Timeframe: h.Slow.Timeframe, OHLCV: *nextSlow,
+				}
+				if len(h.Slow.Data) > j+1 {
+					j = j + 1
+					nextSlow = &h.Slow.Data[j]
+				} else {
+					nextSlow = nil
+				}
+			}
+		}
+		close(ch)
+	}()
+	return ch
+}
+
+func (h HistoricalPair) Bondaries() (from, to time.Time) {
+	return h.Fast.From, h.Fast.To
 }
