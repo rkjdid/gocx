@@ -30,13 +30,12 @@ func (nw *Newave) AddTick(x trading.Tick) {
 		log.Printf("bad timeframe: %s", x.Timeframe)
 	}
 
-	if nw.Fast.LastSignal.Action == nw.Slow.LastSignal.Action {
-		if nw.LastSignal.Action != nw.Fast.LastSignal.Action {
-			nw.LastSignal = Signal{
-				Action:   nw.Fast.LastSignal.Action,
-				Time:     nw.Fast.LastSignal.Time,
-				Strength: 1,
-			}
+	if nw.Fast.LastSignal.Action == nw.Slow.LastSignal.Action &&
+		nw.Fast.LastSignal.Action == Buy {
+		nw.LastSignal = Signal{
+			Action:   Buy,
+			Time:     nw.Fast.LastSignal.Time,
+			Strength: 1,
 		}
 	} else {
 		nw.LastSignal = NoSignal
